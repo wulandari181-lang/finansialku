@@ -1,0 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Allerta+Stencil&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-night: #1B003F;
+  --color-twilight: #4B0082;
+  --color-midnight: #191970;
+  --color-lavender: #E6E6FA;
+  --color-dusky: #6495ED;
+}
