@@ -316,7 +316,7 @@ export default function App() {
                     <div className="w-full">
                       <p className="text-sm font-bold text-night mb-1">Masukkan Kode</p>
                       <div className="flex gap-2 mt-2">
-                        <input type="text" placeholder="Ketik Kode (Cth: SWBASIC26)" className="w-full px-3 py-2 border border-gray-300 rounded-xl outline-none text-sm uppercase bg-slate-50 focus:ring-2 focus:ring-twilight" value={activationCode} onChange={e => setActivationCode(e.target.value)} />
+                        <input type="text" placeholder="Ketik Kode (Cth: YES26)" className="w-full px-3 py-2 border border-gray-300 rounded-xl outline-none text-sm uppercase bg-slate-50 focus:ring-2 focus:ring-twilight" value={activationCode} onChange={e => setActivationCode(e.target.value)} />
                         <button onClick={handleActivateCode} className="bg-twilight text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-night transition-colors shadow-sm">Aktifkan</button>
                       </div>
                     </div>
@@ -527,7 +527,12 @@ export default function App() {
                   <div className="flex justify-center items-center gap-2 relative z-10 mb-1">
                     <p className="text-lavender text-sm mb-0">Estimasi Sisa Gaji Bulan Depan</p>
                     {!isExpired && (
-                      <button onClick={() => setIsEditingProj(!isEditingProj)} className="text-lavender hover:text-white bg-white/10 p-1.5 rounded-md transition" title="Edit Manual">
+                      <button onClick={() => {
+                          setIsEditingProj(!isEditingProj);
+                          // Otomatis tarik angka sistem saat mau diedit agar tidak nol
+                          if (!isEditingProj && manualProjBalance === null) setManualProjBalance(projBalance);
+                        }} 
+                        className="text-lavender hover:text-white bg-white/10 p-1.5 rounded-md transition" title="Edit Manual">
                         <Edit2 size={12}/>
                       </button>
                     )}
@@ -535,11 +540,15 @@ export default function App() {
                   
                   {isEditingProj ? (
                     <div className="flex items-center justify-center gap-2 mt-2 relative z-10">
-                      <input type="number" 
-                             className="w-32 px-2 py-1.5 rounded bg-white/20 text-white font-bold text-center border border-lavender/50 outline-none focus:ring-2 focus:ring-lavender"
-                             value={displayedProjBalance} 
-                             onChange={e => setManualProjBalance(Number(e.target.value))} 
-                             autoFocus />
+                      <div className="relative flex items-center">
+                        <span className="absolute left-3 text-white/70 text-sm font-bold">Rp</span>
+                        <input type="text" 
+                               className="w-40 pl-9 pr-3 py-1.5 rounded bg-white/20 text-white font-bold text-left border border-lavender/50 outline-none focus:ring-2 focus:ring-lavender"
+                               value={manualProjBalance === 0 ? '' : (manualProjBalance || 0).toLocaleString('id-ID')} 
+                               onChange={e => setManualProjBalance(Number(e.target.value.replace(/\D/g, '')))} 
+                               placeholder="0"
+                               autoFocus />
+                      </div>
                       <button onClick={() => {setManualProjBalance(null); setIsEditingProj(false);}} className="text-[10px] bg-red-500/80 px-2 py-2 rounded font-bold hover:bg-red-500 transition shadow-sm">
                         Reset Auto
                       </button>
@@ -594,9 +603,9 @@ export default function App() {
                   <>
                     <div className="bg-gradient-to-br from-white to-lavender rounded-3xl p-6 text-night shadow-2xl relative overflow-hidden border border-lavender/30">
                       <div className="absolute -top-4 -right-4 opacity-50"><Coins size={140} className="text-night/80"/></div>
-                      <p className="text-twilight text-sm font-medium mb-1 relative z-10 opacity-80 flex items-center gap-1.5"><Sparkles size={14} className="text-twilight animate-pulse"/>Total Harta Brankas</p>
+                      <p className="text-twilight text-sm font-medium mb-1 relative z-10 opacity-80 flex items-center gap-1.5"><Sparkles size={14} className="text-twilight animate-pulse"/>Total Harta </p>
                       <h3 className="text-3xl font-extrabold relative z-10 transition-all">{formatRp(totalAssets)}</h3>
-                      <div className="flex items-center gap-1 text-xs text-twilight opacity-70 mt-1 relative z-10 font-medium">Aset amantersimpan di brankas digital <Unlock size={10} className="ml-1"/></div>
+                      <div className="flex items-center gap-1 text-xs text-twilight opacity-70 mt-1 relative z-10 font-medium">Aset aman tersimpan di brankas digital <Unlock size={10} className="ml-1"/></div>
                     </div>
                     <div className="bg-white rounded-2xl p-4 border border-lavender shadow-sm transition-all hover:border-lavender/60">
                       <h3 className="text-sm font-bold text-night mb-3">Tambah Portofolio Aset</h3>
