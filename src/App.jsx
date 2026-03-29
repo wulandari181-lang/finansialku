@@ -341,7 +341,7 @@ export default function App() {
               <div>
                 <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                   {/* LOGO BARU DIPASANG DI SINI */}
-                  <img src="/logo.jpg" alt="Finansialku Logo" className="w-8 h-8 rounded-lg shadow-sm object-cover bg-white" />
+                  <img src="/logo.jpeg" alt="Finansialku Logo" className="w-8 h-8 rounded-lg shadow-sm object-cover bg-white" />
                   Finansialku
                 </h1>
                 <p className="text-lavender text-xs mt-0.5 opacity-90 transition-opacity">Asisten Keuangan Pintar</p>
