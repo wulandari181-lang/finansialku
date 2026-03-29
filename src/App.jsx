@@ -316,7 +316,7 @@ export default function App() {
                   <h3 className="font-bold text-night mb-2 text-sm">Pilih Paket:</h3>
                   <ul className="text-xs text-gray-600 space-y-2 mb-3">
                     <li className="flex items-center"><CheckCircle2 size={14} className="mr-2 text-green-500"/> <span className="font-bold text-night mr-1">Paket Basic (28k):</span> Buka kunci input permanen.</li>
-                    <li className="flex items-center"><CheckCircle2 size={14} className="mr-2 text-green-500"/> <span className="font-bold text-night mr-1">Paket PRO (50k):</span> Basic + Fitur Manajemen Aset.</li>
+                    <li className="flex items-center"><CheckCircle2 size={14} className="mr-2 text-green-500"/> <span className="font-bold text-night mr-1">Paket PRO (49k):</span> Basic + Fitur Manajemen Aset.</li>
                   </ul>
                 </div>
 
