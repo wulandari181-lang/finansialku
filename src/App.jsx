@@ -60,11 +60,9 @@ export default function App() {
   const [projOrangTua, setProjOrangTua] = useState(savedData?.projOrangTua || 0); const [projCicilan, setProjCicilan] = useState(savedData?.projCicilan || 0);
   const [projExpenses, setProjExpenses] = useState(savedData?.projExpenses || []); const [newProjExpName, setNewProjExpName] = useState(''); const [newProjExpAmount, setNewProjExpAmount] = useState(0);
   
-  // STATE PROYEKSI (DIUBAH LOGIKANYA)
   const [isEditingProj, setIsEditingProj] = useState(false); 
   const [manualProjBalance, setManualProjBalance] = useState(savedData?.manualProjBalance || null);
 
-  // STATE ASET
   const [assets, setAssets] = useState(savedData?.assets || []);
   const [newAssetType, setNewAssetType] = useState('apresiasi'); 
   const [newAssetName, setNewAssetName] = useState(''); 
@@ -77,7 +75,6 @@ export default function App() {
   const [withdrawAssetId, setWithdrawAssetId] = useState(null); 
   const [withdrawAssetVal, setWithdrawAssetVal] = useState(0);
 
-  // LOGIKA HITUNG ASET
   const appreciationAssets = useMemo(() => assets.filter(a => a.type === 'apresiasi' || !a.type), [assets]);
   const depreciationAssets = useMemo(() => assets.filter(a => a.type === 'depresiasi'), [assets]);
   
@@ -92,7 +89,6 @@ export default function App() {
       return sum + currentPrice;
   }, 0), [depreciationAssets]);
 
-  // STATE KHUSUS PEMBAYARAN & KODE AKTIVASI
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [activationCode, setActivationCode] = useState('');
   const [copiedText, setCopiedText] = useState(null);
@@ -117,10 +113,7 @@ export default function App() {
   
   const totalAssets = totalAppreciation + totalDepreciation;
   
-  // LOGIKA PROYEKSI YANG DIPERBAIKI:
-  // Base Pemasukan = manual jika diedit, jika tidak pakai totalIncomes bulan ini.
   const baseProjIncome = manualProjBalance !== null ? manualProjBalance : totalIncomes;
-  // Sisa Gaji Proyeksi = Base Pemasukan - (semua potongan dan target)
   const displayedProjBalance = baseProjIncome - projOrangTua - projCicilan - projExpenses.reduce((a, b) => a + b.amount, 0);
 
   const simResult = useMemo(() => {
@@ -302,6 +295,8 @@ export default function App() {
     XLSX.utils.book_append_sheet(wb, ws2, "Aset & Investasi");
     XLSX.writeFile(wb, `Laporan_Finansialku_${selectedMonth}.xlsx`);
   };
+
+  const headerClass = "text-white p-5 shadow-lg rounded-b-3xl transition-colors duration-300 " + (activeTab === 'aset' && isPro ? 'bg-night border-b border-lavender/10' : 'bg-twilight');
 
   return (
     <div className="flex justify-center bg-slate-100 min-h-[100dvh]">
@@ -488,7 +483,7 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB 2: SIMULASI (DIKEMBALIKAN UTUH & PANJANG) */}
+            {/* TAB 2: SIMULASI */}
             {activeTab === 'simulation' && (
                <div className="animate-in fade-in space-y-5">
                 <h2 className="text-lg font-bold text-night flex items-center"><Calculator className="mr-2 text-dusky" size={20} /> Kalkulator Cerdas</h2>
@@ -570,7 +565,7 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB 3: PROYEKSI (DIPERBAIKI LOGIKA EDITNYA) */}
+            {/* TAB 3: PROYEKSI */}
             {activeTab === 'projection' && (
               <div className="animate-in fade-in space-y-5">
                 <h2 className="text-lg font-bold text-night flex items-center"><Target className="mr-2 text-dusky" size={20} /> Proyeksi Bulan Depan</h2>
@@ -582,7 +577,7 @@ export default function App() {
                     {!isExpired && (
                       <button onClick={() => { 
                           setIsEditingProj(!isEditingProj); 
-                          if (!isEditingProj && manualProjBalance === null) setManualProjBalance(totalIncomes); // Set ke total pemasukan bulan ini saat pertama klik
+                          if (!isEditingProj && manualProjBalance === null) setManualProjBalance(totalIncomes); 
                         }} 
                         className="text-lavender hover:text-white bg-white/10 p-1.5 rounded-md transition" title="Edit Gaji Pokok">
                         <Edit2 size={12}/>
@@ -648,7 +643,6 @@ export default function App() {
                   <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-2xl text-center shadow-sm border border-yellow-200"><Crown size={40} className="mx-auto text-yellow-500 mb-3" /><h3 className="font-bold text-night mb-2">Fitur PRO</h3><button onClick={() => setShowUpgradeModal(true)} className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 text-white py-3 rounded-xl font-bold">Upgrade ke PRO Sekarang</button></div>
                 ) : (
                   <>
-                    {/* Harta Brankas */}
                     <div className="bg-gradient-to-br from-midnight to-black rounded-3xl p-6 text-white shadow-2xl relative overflow-hidden">
                       <p className="text-lavender text-sm font-medium mb-1 flex items-center gap-1.5"><Coins size={14}/>Net Worth (Harta Brankas)</p>
                       <h3 className="text-3xl font-extrabold mb-4">{formatRp(totalAssets)}</h3>
@@ -658,7 +652,6 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* FORM INPUT ASET CERDAS */}
                     <div className="bg-white rounded-2xl p-4 border border-lavender/50 shadow-sm">
                       <h3 className="text-sm font-bold text-night mb-3">Pencatatan Aset Baru</h3>
                       <div className="grid grid-cols-2 gap-2 mb-4">
@@ -670,11 +663,20 @@ export default function App() {
                       
                       {newAssetType === 'apresiasi' && (
                         <div className="flex gap-2 mb-3">
-                          <select className="flex-1 px-3.5 py-2.5 border rounded-xl outline-none text-sm bg-slate-50 text-night" value={newAssetCategory} onChange={e => setNewAssetCategory(e.target.value)}><option value="Emas">Emas</option><option value="Deposito">Deposito</option><option value="Reksa Dana">Reksa Dana</option><option value="Properti">Properti</option><option value="Lainnya">Lainnya</option></select>
-                          <div className="flex flex-col items-center w-24">
-  <span className="text-[10px] font-bold text-twilight mb-0.5">Jml {newAssetCategory === 'Emas' ? 'Gram' : 'Unit'}</span>
-  <input type="number" className="w-full px-3.5 py-1.5 border rounded-xl outline-none text-sm bg-slate-50 text-center" value={newAssetUnit} onChange={e => setNewAssetUnit(Number(e.target.value))} min="1" />
-</div>
+                          <select className="flex-1 px-3.5 py-2.5 border rounded-xl outline-none text-sm bg-slate-50 text-night" value={newAssetCategory} onChange={e => setNewAssetCategory(e.target.value)}>
+                            <option value="Emas">Emas</option>
+                            <option value="Deposito">Deposito</option>
+                            <option value="Reksa Dana">Reksa Dana</option>
+                            <option value="Properti">Properti</option>
+                            <option value="Lainnya">Lainnya</option>
+                          </select>
+                          
+                          {/* LABEL JML/UNIT DITAMBAHKAN DI SINI DAN SYNTAX ERROR DIPERBAIKI */}
+                          <div className="flex flex-col items-center w-24 bg-slate-50 border rounded-xl overflow-hidden pt-1">
+                            <span className="text-[9px] font-bold text-twilight">Jml {newAssetCategory === 'Emas' ? 'Gram' : 'Unit'}</span>
+                            <input type="number" className="w-full px-2 py-1 outline-none text-sm bg-transparent text-center font-bold" value={newAssetUnit} onChange={e => setNewAssetUnit(Number(e.target.value))} min="1" />
+                          </div>
+                        </div>
                       )}
 
                       <CurrencyInput label={newAssetType === 'apresiasi' ? `Harga Beli per ${newAssetCategory === 'Emas' ? 'Gram' : 'Unit'} (Modal)` : "Harga Beli / Total Modal Awal"} placeholder="Rp" value={newAssetBuyPrice} onChange={setNewAssetBuyPrice} noMargin={true} />
