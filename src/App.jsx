@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Wallet, Calculator, Calendar, Plus, Trash2, Edit2, TrendingDown, TrendingUp, Target, CheckCircle2, Download, CalendarDays, Lock, Unlock, Sparkles, Coins, Landmark, Crown, Banknote, X, MessageCircle, Copy, Car, ArrowUpRight } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 
 const formatRp = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number || 0);
 const formatExcelNum = (number) => new Intl.NumberFormat('id-ID').format(number || 0);
@@ -221,6 +221,14 @@ export default function App() {
   };
 
   const downloadExcel = () => {
+    // --- RUMUS WARNA DAN GAYA HURUF EXCEL ---
+    const TITLE = (text) => ({ v: text, t: 's', s: { font: { bold: true, sz: 14, color: { rgb: "4C1D95" } }, alignment: { horizontal: "center" } } });
+    const H_MAIN = (text) => ({ v: text, t: 's', s: { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "4C1D95" } }, alignment: { horizontal: "center", vertical: "center" } } });
+    const H_GREEN = (text) => ({ v: text, t: 's', s: { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "16A34A" } }, alignment: { horizontal: "center" } } });
+    const H_RED = (text) => ({ v: text, t: 's', s: { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "DC2626" } }, alignment: { horizontal: "center" } } });
+    const TOTAL = (val) => ({ v: val, t: 'n', s: { font: { bold: true } } });
+    const TOTAL_TXT = (text) => ({ v: text, t: 's', s: { font: { bold: true } } });
+
     let runningBalance = 0; let noDebit = 1; let noKredit = 1; 
     let sumDebit = 0; let sumKredit = 0;
     const transactions = [];
@@ -236,21 +244,22 @@ export default function App() {
         transactions.push([noKredit++, exp.date, exp.name, "Pengeluaran", 0, exp.amount, runningBalance]); 
     });
     
-    transactions.push(["", "", "", "TOTAL KESELURUHAN", sumDebit, sumKredit, runningBalance]);
+    // Baris Total Bawah Sheet 1
+    transactions.push(["", "", "", TOTAL_TXT("TOTAL KESELURUHAN"), TOTAL(sumDebit), TOTAL(sumKredit), TOTAL(runningBalance)]);
 
     const ws1Data = [
-        ["", "", "CATATAN KEUANGAN PERIODE " + formatMonthDisplay(selectedMonth).toUpperCase(), "", "", "", ""],
+        ["", "", TITLE("CATATAN KEUANGAN PERIODE " + formatMonthDisplay(selectedMonth).toUpperCase()), "", "", "", ""],
         [],
-        ["No", "Tanggal", "Keterangan", "Kategori", "Debit (Rp)", "Kredit (Rp)", "Saldo (Rp)"], 
+        [H_MAIN("No"), H_MAIN("Tanggal"), H_MAIN("Keterangan"), H_MAIN("Kategori"), H_MAIN("Debit (Rp)"), H_MAIN("Kredit (Rp)"), H_MAIN("Saldo (Rp)")], 
         ...transactions
     ];
     const ws1 = XLSX.utils.aoa_to_sheet(ws1Data);
     ws1['!cols'] = [{wch: 5}, {wch: 12}, {wch: 25}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}];
 
     const ws2Data = [
-        ["", "", "", "CATATAN ASET DAN INVESTASI", "", "", "", "", ""], [],
-        ["--- TABEL A: ASET APRESIASI (NILAI NAIK) ---"], 
-        ["No", "Nama Aset", "Kategori", "Unit/Gram", "Harga Beli (per unit)", "Total Modal (Rp)", "Harga Pasar Saat Ini", "Nilai Saat Ini (Rp)", "Selisih/Profit (Rp)", "Keterangan"]
+        ["", "", "", TITLE("CATATAN ASET DAN INVESTASI"), "", "", "", "", ""], [],
+        [H_GREEN("--- TABEL A: ASET APRESIASI (NILAI NAIK) ---")], 
+        [H_GREEN("No"), H_GREEN("Nama Aset"), H_GREEN("Kategori"), H_GREEN("Unit/Gram"), H_GREEN("Harga Beli (Modal)"), H_GREEN("Total Modal (Rp)"), H_GREEN("Harga Pasar Skrg"), H_GREEN("Nilai Saat Ini (Rp)"), H_GREEN("Selisih/Profit (Rp)"), H_GREEN("Keterangan")]
     ];
 
     let sumModalApresiasi = 0; let sumNilaiApresiasi = 0; let sumSelisihApresiasi = 0;
@@ -265,9 +274,10 @@ export default function App() {
         sumModalApresiasi += totalModal; sumNilaiApresiasi += totalNilai; sumSelisihApresiasi += profit;
         ws2Data.push([i + 1, a.name, a.category, unit, buy, totalModal, cur, totalNilai, formatProfit(profit), profit >= 0 ? "Profit" : "Loss"]);
     });
-    ws2Data.push(["", "", "", "", "TOTAL APRESIASI", sumModalApresiasi, "", sumNilaiApresiasi, formatProfit(sumSelisihApresiasi), ""]);
-    ws2Data.push([], [], ["--- TABEL B: ASET DEPRESIASI (NILAI TURUN) ---"], 
-        ["No", "Nama Aset", "Harga Beli / Awal (Rp)", "Nilai Saat Ini (Rp)", "Penurunan/Penyusutan (Rp)", "Keterangan"]
+    ws2Data.push(["", "", "", "", TOTAL_TXT("TOTAL APRESIASI"), TOTAL(sumModalApresiasi), "", TOTAL(sumNilaiApresiasi), TOTAL_TXT(formatProfit(sumSelisihApresiasi)), ""]);
+    
+    ws2Data.push([], [], [H_RED("--- TABEL B: ASET DEPRESIASI (NILAI TURUN) ---")], 
+        [H_RED("No"), H_RED("Nama Aset"), H_RED("Harga Beli / Awal (Rp)"), H_RED("Nilai Saat Ini (Rp)"), H_RED("Penurunan/Susut (Rp)"), H_RED("Keterangan")]
     );
 
     let sumModalDepresiasi = 0; let sumNilaiDepresiasi = 0; let sumSelisihDepresiasi = 0;
@@ -279,10 +289,10 @@ export default function App() {
         sumModalDepresiasi += buy; sumNilaiDepresiasi += cur; sumSelisihDepresiasi += loss;
         ws2Data.push([i + 1, a.name, buy, cur, formatProfit(loss), "Depresiasi"]);
     });
-    ws2Data.push(["", "TOTAL DEPRESIASI", sumModalDepresiasi, sumNilaiDepresiasi, formatProfit(sumSelisihDepresiasi), ""]);
+    ws2Data.push(["", TOTAL_TXT("TOTAL DEPRESIASI"), TOTAL(sumModalDepresiasi), TOTAL(sumNilaiDepresiasi), TOTAL_TXT(formatProfit(sumSelisihDepresiasi)), ""]);
     
-    ws2Data.push([], [], ["========================================"]);
-    ws2Data.push(["GRAND TOTAL HARTA (NET WORTH)", "", "", "", "", "", "", sumNilaiApresiasi + sumNilaiDepresiasi]);
+    ws2Data.push([], [], [TOTAL_TXT("======================================================")]);
+    ws2Data.push([TITLE("GRAND TOTAL HARTA (NET WORTH)"), "", "", "", "", "", "", TOTAL(sumNilaiApresiasi + sumNilaiDepresiasi)]);
 
     const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
     ws2['!cols'] = [{wch: 5}, {wch: 25}, {wch: 15}, {wch: 10}, {wch: 15}, {wch: 18}, {wch: 18}, {wch: 18}, {wch: 18}, {wch: 15}];
@@ -292,9 +302,6 @@ export default function App() {
     XLSX.utils.book_append_sheet(wb, ws2, "Aset & Investasi");
     XLSX.writeFile(wb, `Laporan_Finansialku_${selectedMonth}.xlsx`);
   };
-
-  const handleCopy = (text) => { navigator.clipboard.writeText(text); setCopiedText(text); setTimeout(() => setCopiedText(null), 2000); };
-  const headerClass = "text-white p-5 shadow-lg rounded-b-3xl transition-colors duration-300 " + (activeTab === 'aset' && isPro ? 'bg-night border-b border-lavender/10' : 'bg-twilight');
 
   return (
     <div className="flex justify-center bg-slate-100 min-h-[100dvh]">
@@ -664,8 +671,10 @@ export default function App() {
                       {newAssetType === 'apresiasi' && (
                         <div className="flex gap-2 mb-3">
                           <select className="flex-1 px-3.5 py-2.5 border rounded-xl outline-none text-sm bg-slate-50 text-night" value={newAssetCategory} onChange={e => setNewAssetCategory(e.target.value)}><option value="Emas">Emas</option><option value="Deposito">Deposito</option><option value="Reksa Dana">Reksa Dana</option><option value="Properti">Properti</option><option value="Lainnya">Lainnya</option></select>
-                          <input type="number" placeholder="Unit/Gram?" className="w-24 px-3.5 py-2.5 border rounded-xl outline-none text-sm bg-slate-50 text-center" value={newAssetUnit} onChange={e => setNewAssetUnit(Number(e.target.value))} min="1" />
-                        </div>
+                          <div className="flex flex-col items-center w-24">
+  <span className="text-[10px] font-bold text-twilight mb-0.5">Jml {newAssetCategory === 'Emas' ? 'Gram' : 'Unit'}</span>
+  <input type="number" className="w-full px-3.5 py-1.5 border rounded-xl outline-none text-sm bg-slate-50 text-center" value={newAssetUnit} onChange={e => setNewAssetUnit(Number(e.target.value))} min="1" />
+</div>
                       )}
 
                       <CurrencyInput label={newAssetType === 'apresiasi' ? `Harga Beli per ${newAssetCategory === 'Emas' ? 'Gram' : 'Unit'} (Modal)` : "Harga Beli / Total Modal Awal"} placeholder="Rp" value={newAssetBuyPrice} onChange={setNewAssetBuyPrice} noMargin={true} />
