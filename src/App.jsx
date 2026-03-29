@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Wallet, Calculator, Calendar, Plus, Trash2, Edit2, TrendingDown, TrendingUp, Target, CheckCircle2, Download, CalendarDays, Lock, Unlock, Sparkles, Coins, Landmark, Crown, Banknote, X, MessageCircle, Copy } from 'lucide-react';
+import * as XLSX from 'xlsx'; // <--- Ini mesin pembuat Excel barunya
 
 const formatRp = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number || 0);
 const getTodayDate = () => new Date().toISOString().split('T')[0];
@@ -57,6 +58,10 @@ export default function App() {
 
   const [projOrangTua, setProjOrangTua] = useState(savedData?.projOrangTua || 0); const [projCicilan, setProjCicilan] = useState(savedData?.projCicilan || 0);
   const [projExpenses, setProjExpenses] = useState(savedData?.projExpenses || []); const [newProjExpName, setNewProjExpName] = useState(''); const [newProjExpAmount, setNewProjExpAmount] = useState(0);
+  
+  // STATE BARU: Untuk Edit Gaji Manual
+  const [isEditingProj, setIsEditingProj] = useState(false);
+  const [manualProjBalance, setManualProjBalance] = useState(savedData?.manualProjBalance || null);
 
   const [assets, setAssets] = useState(savedData?.assets || []);
   const [newAssetName, setNewAssetName] = useState(''); const [newAssetAmount, setNewAssetAmount] = useState(0);
@@ -66,7 +71,7 @@ export default function App() {
   // --- STATE KHUSUS PEMBAYARAN & KODE AKTIVASI ---
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [activationCode, setActivationCode] = useState('');
-  const [copiedText, setCopiedText] = useState(null); // State untuk menyimpan nomor yg sedang di-copy
+  const [copiedText, setCopiedText] = useState(null);
 
   // 🟢 KONFIGURASI INFO REKENING & E-WALLET KAKAK 🟢
   const bankAccounts = [
@@ -79,18 +84,23 @@ export default function App() {
     { nama: "GoPay", no: "085259399968" }
   ];
 
-  const noWhatsApp = "6285259399968"; // Format WA: 62 diawal tanpa angka 0
+  const noWhatsApp = "6285259399968"; 
   // ------------------------------------------------
 
   useEffect(() => {
-    localStorage.setItem('finansialku_app_data', JSON.stringify({ monthlyData, projOrangTua, projCicilan, projExpenses, assets, firstOpenDate, userTier }));
-  }, [monthlyData, projOrangTua, projCicilan, projExpenses, assets, firstOpenDate, userTier]);
+    // Jangan lupa simpan manualProjBalance ke memori
+    localStorage.setItem('finansialku_app_data', JSON.stringify({ monthlyData, projOrangTua, projCicilan, projExpenses, assets, firstOpenDate, userTier, manualProjBalance }));
+  }, [monthlyData, projOrangTua, projCicilan, projExpenses, assets, firstOpenDate, userTier, manualProjBalance]);
 
   const totalIncomes = useMemo(() => currentMonthData.incomes?.reduce((a, b) => a + b.amount, 0) || 0, [currentMonthData.incomes]);
   const totalExpenses = useMemo(() => currentMonthData.expenses?.reduce((a, b) => a + b.amount, 0) || 0, [currentMonthData.expenses]);
   const currentBalance = totalIncomes - totalExpenses;
   const totalAssets = useMemo(() => assets.reduce((a, b) => a + b.amount, 0), [assets]);
+  
+  // Nilai otomatis proyeksi
   const projBalance = totalIncomes - projOrangTua - projCicilan - projExpenses.reduce((a, b) => a + b.amount, 0);
+  // Nilai yang ditampilkan (Prioritaskan manual jika ada, jika tidak pakai otomatis)
+  const displayedProjBalance = manualProjBalance !== null ? manualProjBalance : projBalance;
 
   const simResult = useMemo(() => {
     const pokok = Math.max(0, simItemPrice - simDP);
@@ -145,6 +155,7 @@ export default function App() {
       alert('Kode Aktivasi tidak valid. Silakan hubungi Admin via WA.');
     }
   };
+
   const exportData = () => {
     const dataStr = localStorage.getItem('finansialku_app_data');
     if (!dataStr) return alert("Belum ada data untuk dibackup!");
@@ -159,7 +170,6 @@ export default function App() {
     alert("Berhasil! File backup telah didownload. Simpan file ini baik-baik.");
   };
 
-// FUNGSI UNTUK BACKUP DATA
   const importData = (event) => {
     const fileReader = new FileReader();
     fileReader.readAsText(event.target.files[0], "UTF-8");
@@ -168,7 +178,7 @@ export default function App() {
         const json = JSON.parse(e.target.result);
         if (window.confirm("Import data akan menimpa data saat ini. Lanjutkan?")) {
           localStorage.setItem('finansialku_app_data', JSON.stringify(json));
-          window.location.reload(); // Refresh aplikasi untuk memuat data baru
+          window.location.reload(); 
         }
       } catch (err) {
         alert("File tidak valid!");
@@ -176,33 +186,49 @@ export default function App() {
     };
   };
 
-  // DOWNLOAD LAPORAN FINANSIAL
-  const downloadCSV = () => {
-    let csv = "Tanggal,Nama,Kategori,Nominal\n";
-    // Tarik data Pemasukan
+  // --- DOWNLOAD EXCEL MULTI-SHEET (BARU) ---
+  const downloadExcel = () => {
+    let runningBalance = 0;
+    let no = 1;
+    const transactions = [];
+
+    // 1. Kumpulkan Pemasukan
     (currentMonthData.incomes || []).forEach(inc => {
-      csv += `-,${inc.name},Pemasukan,${inc.amount}\n`;
+      runningBalance += inc.amount;
+      transactions.push([no++, "-", inc.name, "Pemasukan", inc.amount, 0, runningBalance]);
     });
-    // Tarik data Pengeluaran
-    (currentMonthData.expenses || []).forEach(exp => {
-      csv += `${exp.date},${exp.name},Pengeluaran,${exp.amount}\n`;
+
+    // 2. Kumpulkan Pengeluaran (Urut berdasarkan tanggal)
+    const sortedExpenses = [...(currentMonthData.expenses || [])].sort((a,b) => new Date(a.date) - new Date(b.date));
+    sortedExpenses.forEach(exp => {
+      runningBalance -= exp.amount;
+      transactions.push([no++, exp.date, exp.name, "Pengeluaran", 0, exp.amount, runningBalance]);
     });
-    
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Rekapan_Finansialku_${selectedMonth}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    // 3. Buat Sheet 1 (Catatan Keuangan)
+    const title1 = [[`Catatan Keuangan Periode ${formatMonthDisplay(selectedMonth)}`]];
+    const header1 = [["No", "Tanggal", "Keterangan", "Kategori", "Pemasukan (Rp)", "Pengeluaran (Rp)", "Saldo"]];
+    const ws1 = XLSX.utils.aoa_to_sheet([...title1, [], ...header1, ...transactions]);
+
+    // 4. Buat Sheet 2 (Catatan Aset)
+    const title2 = [["Catatan Aset dan Investasi"]];
+    const header2 = [["No", "Nama Aset", "Nilai (Rp)"]];
+    const assetData = assets.map((a, i) => [i + 1, a.name, a.amount]);
+    const ws2 = XLSX.utils.aoa_to_sheet([...title2, [], ...header2, ...assetData]);
+
+    // 5. Gabungkan menjadi 1 file Excel
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, "Bulan Ini");
+    XLSX.utils.book_append_sheet(wb, ws2, "Aset & Investasi");
+
+    // 6. Download!
+    XLSX.writeFile(wb, `Laporan_Finansialku_${selectedMonth}.xlsx`);
   };
 
-  // FUNGSI UNTUK COPY TEKS
   const handleCopy = (text) => {
     navigator.clipboard.writeText(text);
     setCopiedText(text);
-    setTimeout(() => setCopiedText(null), 2000); // Centang hijau hilang setelah 2 detik
+    setTimeout(() => setCopiedText(null), 2000); 
   };
 
   const headerBaseClass = "text-white p-5 shadow-lg rounded-b-3xl transition-colors duration-300";
@@ -271,7 +297,6 @@ export default function App() {
                           </div>
                         </div>
                       </div>
-
                     </div>
                   </div>
 
@@ -314,7 +339,11 @@ export default function App() {
           <header className={headerClass}>
             <div className="flex justify-between items-start mb-3">
               <div>
-                <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Landmark size={24} className="text-lavender transition-opacity" /> Finansialku</h1>
+                <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                  {/* LOGO BARU DIPASANG DI SINI */}
+                  <img src="/logo.jpg" alt="Finansialku Logo" className="w-8 h-8 rounded-lg shadow-sm object-cover bg-white" />
+                  Finansialku
+                </h1>
                 <p className="text-lavender text-xs mt-0.5 opacity-90 transition-opacity">Asisten Keuangan Pintar</p>
               </div>
               {userTier === 'pro' ? (
@@ -358,9 +387,10 @@ export default function App() {
                     <div><p className="text-lavender text-xs flex items-center"><TrendingDown size={14} className="mr-1"/> Pengeluaran</p><p className="font-semibold text-sm">{formatRp(totalExpenses)}</p></div>
                   </div>
                 </div>
-                <button onClick={downloadCSV} disabled={isExpired} className="w-full bg-white border border-lavender/50 text-twilight py-3 rounded-2xl font-bold text-xs shadow-sm hover:bg-slate-50 transition mb-4 flex items-center justify-center disabled:opacity-50">
-    <Download size={16} className="mr-2" /> Download Laporan Bulan Ini (Excel/CSV)
-  </button>
+                {/* TOMBOL DOWNLOAD EXCEL BARU */}
+                <button onClick={downloadExcel} disabled={isExpired} className="w-full bg-white border border-lavender/50 text-twilight py-3 rounded-2xl font-bold text-xs shadow-sm hover:bg-slate-50 transition mb-4 flex items-center justify-center disabled:opacity-50">
+                  <Download size={16} className="mr-2" /> Download Laporan Excel (Multi-Sheet)
+                </button>
                 <div>
                   <h3 className="text-md font-bold mb-3 text-night">Sumber Pemasukan</h3>
                   <div className={`bg-white rounded-2xl p-4 border ${isExpired ? 'border-red-200 opacity-60' : 'border-lavender/40'} shadow-sm mb-3 relative`}>
@@ -402,22 +432,22 @@ export default function App() {
                     ))}
                   </div>
                   <div className="mt-8 p-4 bg-slate-100 rounded-2xl border border-dashed border-gray-300">
-    <h3 className="text-xs font-bold text-night mb-2 flex items-center tracking-tight">
-      <Download size={14} className="mr-1.5" /> KEAMANAN DATA (BACKUP)
-    </h3>
-    <p className="text-[10px] text-gray-500 mb-3 leading-relaxed">
-      Data Anda tersimpan di HP ini. Lakukan backup berkala agar data tidak hilang jika cache browser dihapus.
-    </p>
-    <div className="flex gap-2">
-      <button onClick={exportData} className="flex-1 bg-white border border-gray-300 text-night py-2 rounded-xl text-[10px] font-bold shadow-sm hover:bg-slate-50 transition">
-        Ekspor (Download)
-      </button>
-      <label className="flex-1 bg-white border border-gray-300 text-night py-2 rounded-xl text-[10px] font-bold shadow-sm hover:bg-slate-50 transition cursor-pointer text-center">
-        Impor (Upload)
-        <input type="file" accept=".json" onChange={importData} className="hidden" />
-      </label>
-    </div>
-  </div>
+                    <h3 className="text-xs font-bold text-night mb-2 flex items-center tracking-tight">
+                      <Download size={14} className="mr-1.5" /> KEAMANAN DATA (BACKUP)
+                    </h3>
+                    <p className="text-[10px] text-gray-500 mb-3 leading-relaxed">
+                      Data Anda tersimpan di HP ini. Lakukan backup berkala agar data tidak hilang jika cache browser dihapus.
+                    </p>
+                    <div className="flex gap-2">
+                      <button onClick={exportData} className="flex-1 bg-white border border-gray-300 text-night py-2 rounded-xl text-[10px] font-bold shadow-sm hover:bg-slate-50 transition">
+                        Ekspor (Download)
+                      </button>
+                      <label className="flex-1 bg-white border border-gray-300 text-night py-2 rounded-xl text-[10px] font-bold shadow-sm hover:bg-slate-50 transition cursor-pointer text-center">
+                        Impor (Upload)
+                        <input type="file" accept=".json" onChange={importData} className="hidden" />
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -490,11 +520,40 @@ export default function App() {
             {activeTab === 'projection' && (
               <div className="animate-in fade-in space-y-5">
                 <h2 className="text-lg font-bold text-night flex items-center"><Target className="mr-2 text-dusky" size={20} /> Proyeksi Bulan Depan</h2>
+                
+                {/* --- KOTAK SISA GAJI DENGAN FITUR EDIT MANUAL --- */}
                 <div className="bg-gradient-to-br from-dusky to-midnight rounded-2xl p-5 text-white shadow-lg text-center relative overflow-hidden">
                   <div className="absolute -top-4 -right-4 opacity-10"><CalendarDays size={120} /></div>
-                  <p className="text-lavender text-sm mb-1 relative z-10">Estimasi Sisa Gaji Bulan Depan</p>
-                  <h3 className={`text-3xl font-bold relative z-10 transition-colors ${projBalance < 0 ? 'text-red-300' : 'text-white'}`}>{formatRp(projBalance)}</h3>
+                  <div className="flex justify-center items-center gap-2 relative z-10 mb-1">
+                    <p className="text-lavender text-sm mb-0">Estimasi Sisa Gaji Bulan Depan</p>
+                    {!isExpired && (
+                      <button onClick={() => setIsEditingProj(!isEditingProj)} className="text-lavender hover:text-white bg-white/10 p-1.5 rounded-md transition" title="Edit Manual">
+                        <Edit2 size={12}/>
+                      </button>
+                    )}
+                  </div>
+                  
+                  {isEditingProj ? (
+                    <div className="flex items-center justify-center gap-2 mt-2 relative z-10">
+                      <input type="number" 
+                             className="w-32 px-2 py-1.5 rounded bg-white/20 text-white font-bold text-center border border-lavender/50 outline-none focus:ring-2 focus:ring-lavender"
+                             value={displayedProjBalance} 
+                             onChange={e => setManualProjBalance(Number(e.target.value))} 
+                             autoFocus />
+                      <button onClick={() => {setManualProjBalance(null); setIsEditingProj(false);}} className="text-[10px] bg-red-500/80 px-2 py-2 rounded font-bold hover:bg-red-500 transition shadow-sm">
+                        Reset Auto
+                      </button>
+                    </div>
+                  ) : (
+                    <h3 className={`text-3xl font-bold relative z-10 transition-colors ${displayedProjBalance < 0 ? 'text-red-300' : 'text-white'}`}>
+                      {formatRp(displayedProjBalance)}
+                      {manualProjBalance !== null && (
+                        <span className="text-[9px] ml-2 align-middle bg-yellow-500/90 text-white px-1.5 py-0.5 rounded shadow-sm tracking-wide">EDITED</span>
+                      )}
+                    </h3>
+                  )}
                 </div>
+
                 <div className={`bg-white p-4 rounded-2xl border transition-all ${isExpired ? 'border-red-200 opacity-70' : 'border-lavender/40'} shadow-sm relative`}>
                   {isExpired && <Lock className="absolute top-4 right-4 text-red-400" size={18}/>}
                   <h3 className="text-sm font-bold text-night mb-3">Potongan Wajib</h3>
