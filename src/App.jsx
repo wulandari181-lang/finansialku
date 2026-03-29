@@ -145,6 +145,58 @@ export default function App() {
       alert('Kode Aktivasi tidak valid. Silakan hubungi Admin via WA.');
     }
   };
+  const exportData = () => {
+    const dataStr = localStorage.getItem('finansialku_app_data');
+    if (!dataStr) return alert("Belum ada data untuk dibackup!");
+    
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    const exportFileDefaultName = `backup_finansialku_${getTodayDate()}.json`;
+
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+    alert("Berhasil! File backup telah didownload. Simpan file ini baik-baik.");
+  };
+
+// FUNGSI UNTUK BACKUP DATA
+  const importData = (event) => {
+    const fileReader = new FileReader();
+    fileReader.readAsText(event.target.files[0], "UTF-8");
+    fileReader.onload = e => {
+      try {
+        const json = JSON.parse(e.target.result);
+        if (window.confirm("Import data akan menimpa data saat ini. Lanjutkan?")) {
+          localStorage.setItem('finansialku_app_data', JSON.stringify(json));
+          window.location.reload(); // Refresh aplikasi untuk memuat data baru
+        }
+      } catch (err) {
+        alert("File tidak valid!");
+      }
+    };
+  };
+
+  // DOWNLOAD LAPORAN FINANSIAL
+  const downloadCSV = () => {
+    let csv = "Tanggal,Nama,Kategori,Nominal\n";
+    // Tarik data Pemasukan
+    (currentMonthData.incomes || []).forEach(inc => {
+      csv += `-,${inc.name},Pemasukan,${inc.amount}\n`;
+    });
+    // Tarik data Pengeluaran
+    (currentMonthData.expenses || []).forEach(exp => {
+      csv += `${exp.date},${exp.name},Pengeluaran,${exp.amount}\n`;
+    });
+    
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Rekapan_Finansialku_${selectedMonth}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // FUNGSI UNTUK COPY TEKS
   const handleCopy = (text) => {
@@ -306,6 +358,9 @@ export default function App() {
                     <div><p className="text-lavender text-xs flex items-center"><TrendingDown size={14} className="mr-1"/> Pengeluaran</p><p className="font-semibold text-sm">{formatRp(totalExpenses)}</p></div>
                   </div>
                 </div>
+                <button onClick={downloadCSV} disabled={isExpired} className="w-full bg-white border border-lavender/50 text-twilight py-3 rounded-2xl font-bold text-xs shadow-sm hover:bg-slate-50 transition mb-4 flex items-center justify-center disabled:opacity-50">
+    <Download size={16} className="mr-2" /> Download Laporan Bulan Ini (Excel/CSV)
+  </button>
                 <div>
                   <h3 className="text-md font-bold mb-3 text-night">Sumber Pemasukan</h3>
                   <div className={`bg-white rounded-2xl p-4 border ${isExpired ? 'border-red-200 opacity-60' : 'border-lavender/40'} shadow-sm mb-3 relative`}>
@@ -346,6 +401,23 @@ export default function App() {
                       </div>
                     ))}
                   </div>
+                  <div className="mt-8 p-4 bg-slate-100 rounded-2xl border border-dashed border-gray-300">
+    <h3 className="text-xs font-bold text-night mb-2 flex items-center tracking-tight">
+      <Download size={14} className="mr-1.5" /> KEAMANAN DATA (BACKUP)
+    </h3>
+    <p className="text-[10px] text-gray-500 mb-3 leading-relaxed">
+      Data Anda tersimpan di HP ini. Lakukan backup berkala agar data tidak hilang jika cache browser dihapus.
+    </p>
+    <div className="flex gap-2">
+      <button onClick={exportData} className="flex-1 bg-white border border-gray-300 text-night py-2 rounded-xl text-[10px] font-bold shadow-sm hover:bg-slate-50 transition">
+        Ekspor (Download)
+      </button>
+      <label className="flex-1 bg-white border border-gray-300 text-night py-2 rounded-xl text-[10px] font-bold shadow-sm hover:bg-slate-50 transition cursor-pointer text-center">
+        Impor (Upload)
+        <input type="file" accept=".json" onChange={importData} className="hidden" />
+      </label>
+    </div>
+  </div>
                 </div>
               </div>
             )}
