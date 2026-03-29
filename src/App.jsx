@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Wallet, Calculator, Calendar, Plus, Trash2, Edit2, TrendingDown, TrendingUp, Target, CheckCircle2, Download, CalendarDays, Lock, Unlock, Sparkles, Coins, Landmark, Crown, Banknote, X, MessageCircle, Copy } from 'lucide-react';
-import * as XLSX from 'xlsx'; // <--- Ini mesin pembuat Excel barunya
+import { Wallet, Calculator, Calendar, Plus, Trash2, Edit2, TrendingDown, TrendingUp, Target, CheckCircle2, Download, CalendarDays, Lock, Unlock, Sparkles, Coins, Landmark, Crown, Banknote, X, MessageCircle, Copy, Car } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const formatRp = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number || 0);
 const getTodayDate = () => new Date().toISOString().split('T')[0];
@@ -59,47 +59,47 @@ export default function App() {
   const [projOrangTua, setProjOrangTua] = useState(savedData?.projOrangTua || 0); const [projCicilan, setProjCicilan] = useState(savedData?.projCicilan || 0);
   const [projExpenses, setProjExpenses] = useState(savedData?.projExpenses || []); const [newProjExpName, setNewProjExpName] = useState(''); const [newProjExpAmount, setNewProjExpAmount] = useState(0);
   
-  // STATE BARU: Untuk Edit Gaji Manual
   const [isEditingProj, setIsEditingProj] = useState(false);
   const [manualProjBalance, setManualProjBalance] = useState(savedData?.manualProjBalance || null);
 
   const [assets, setAssets] = useState(savedData?.assets || []);
   const [newAssetName, setNewAssetName] = useState(''); const [newAssetAmount, setNewAssetAmount] = useState(0);
+  const [newAssetType, setNewAssetType] = useState('apresiasi'); 
+  
   const [editAssetId, setEditAssetId] = useState(null); const [editAssetVal, setEditAssetVal] = useState(0);
   const [withdrawAssetId, setWithdrawAssetId] = useState(null); const [withdrawAssetVal, setWithdrawAssetVal] = useState(0);
 
-  // --- STATE KHUSUS PEMBAYARAN & KODE AKTIVASI ---
+  const appreciationAssets = useMemo(() => assets.filter(a => a.type === 'apresiasi' || !a.type), [assets]);
+  const depreciationAssets = useMemo(() => assets.filter(a => a.type === 'depresiasi'), [assets]);
+  
+  const totalAppreciation = useMemo(() => appreciationAssets.reduce((a, b) => a + b.amount, 0), [appreciationAssets]);
+  const totalDepreciation = useMemo(() => depreciationAssets.reduce((a, b) => a + b.amount, 0), [depreciationAssets]);
+
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [activationCode, setActivationCode] = useState('');
   const [copiedText, setCopiedText] = useState(null);
 
-  // 🟢 KONFIGURASI INFO REKENING & E-WALLET KAKAK 🟢
   const bankAccounts = [
     { bank: "BCA", norek: "0182364981", nama: "Setiya Wulandari" },
     { bank: "SEABANK", norek: "901548485318", nama: "Setiya Wulandari" }
   ];
-
   const eWallets = [
     { nama: "ShopeePay", no: "085259399968" },
     { nama: "GoPay", no: "085259399968" }
   ];
-
   const noWhatsApp = "6285259399968"; 
-  // ------------------------------------------------
 
   useEffect(() => {
-    // Jangan lupa simpan manualProjBalance ke memori
     localStorage.setItem('finansialku_app_data', JSON.stringify({ monthlyData, projOrangTua, projCicilan, projExpenses, assets, firstOpenDate, userTier, manualProjBalance }));
   }, [monthlyData, projOrangTua, projCicilan, projExpenses, assets, firstOpenDate, userTier, manualProjBalance]);
 
   const totalIncomes = useMemo(() => currentMonthData.incomes?.reduce((a, b) => a + b.amount, 0) || 0, [currentMonthData.incomes]);
   const totalExpenses = useMemo(() => currentMonthData.expenses?.reduce((a, b) => a + b.amount, 0) || 0, [currentMonthData.expenses]);
   const currentBalance = totalIncomes - totalExpenses;
-  const totalAssets = useMemo(() => assets.reduce((a, b) => a + b.amount, 0), [assets]);
   
-  // Nilai otomatis proyeksi
+  const totalAssets = totalAppreciation + totalDepreciation;
+  
   const projBalance = totalIncomes - projOrangTua - projCicilan - projExpenses.reduce((a, b) => a + b.amount, 0);
-  // Nilai yang ditampilkan (Prioritaskan manual jika ada, jika tidak pakai otomatis)
   const displayedProjBalance = manualProjBalance !== null ? manualProjBalance : projBalance;
 
   const simResult = useMemo(() => {
@@ -133,7 +133,8 @@ export default function App() {
   const removeExpense = (id) => confirmDelete(() => updateMonth({ expenses: currentMonthData.expenses.filter(e => e.id !== id) }));
   const addProjExp = () => { if (!isExpired && newProjExpName && newProjExpAmount > 0) { setProjExpenses([...projExpenses, { id: Date.now(), name: newProjExpName, amount: newProjExpAmount }]); setNewProjExpName(''); setNewProjExpAmount(0); } };
   const removeProjExp = (id) => confirmDelete(() => setProjExpenses(projExpenses.filter(e => e.id !== id)));
-  const addAsset = () => { if (isPro && newAssetName && newAssetAmount > 0) { setAssets([...assets, { id: Date.now(), name: newAssetName, amount: newAssetAmount }]); setNewAssetName(''); setNewAssetAmount(0); } };
+  
+  const addAsset = () => { if (isPro && newAssetName && newAssetAmount > 0) { setAssets([...assets, { id: Date.now(), name: newAssetName, amount: newAssetAmount, type: newAssetType }]); setNewAssetName(''); setNewAssetAmount(0); } };
   const removeAsset = (id) => confirmDelete(() => setAssets(assets.filter(e => e.id !== id)));
   const handleWithdrawAsset = (asset) => {
     if (withdrawAssetVal <= 0 || withdrawAssetVal > asset.amount) return alert("Nominal melebihi saldo aset!");
@@ -145,91 +146,49 @@ export default function App() {
 
   const handleActivateCode = () => {
     const code = activationCode.trim().toUpperCase();
-    if (code === 'SWBASIC26') {
-      setUserTier('basic'); setShowUpgradeModal(false); setActivationCode('');
-      alert('Selamat! Aplikasi berhasil di-Upgrade ke Paket BASIC.');
-    } else if (code === 'SWPRO26') {
-      setUserTier('pro'); setShowUpgradeModal(false); setActivationCode('');
-      alert('Luar Biasa! Selamat datang di Paket PRO. Fitur Aset telah terbuka!');
-    } else {
-      alert('Kode Aktivasi tidak valid. Silakan hubungi Admin via WA.');
-    }
+    if (code === 'SWBASIC26') { setUserTier('basic'); setShowUpgradeModal(false); setActivationCode(''); alert('Selamat! Aplikasi berhasil di-Upgrade ke Paket BASIC.'); } 
+    else if (code === 'SWPRO26') { setUserTier('pro'); setShowUpgradeModal(false); setActivationCode(''); alert('Luar Biasa! Selamat datang di Paket PRO. Fitur Aset telah terbuka!'); } 
+    else { alert('Kode Aktivasi tidak valid. Silakan hubungi Admin via WA.'); }
   };
 
   const exportData = () => {
     const dataStr = localStorage.getItem('finansialku_app_data');
     if (!dataStr) return alert("Belum ada data untuk dibackup!");
-    
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    const exportFileDefaultName = `backup_finansialku_${getTodayDate()}.json`;
-
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
-    linkElement.click();
+    const linkElement = document.createElement('a'); linkElement.setAttribute('href', dataUri); linkElement.setAttribute('download', `backup_finansialku_${getTodayDate()}.json`); linkElement.click();
     alert("Berhasil! File backup telah didownload. Simpan file ini baik-baik.");
   };
 
   const importData = (event) => {
-    const fileReader = new FileReader();
-    fileReader.readAsText(event.target.files[0], "UTF-8");
+    const fileReader = new FileReader(); fileReader.readAsText(event.target.files[0], "UTF-8");
     fileReader.onload = e => {
-      try {
-        const json = JSON.parse(e.target.result);
-        if (window.confirm("Import data akan menimpa data saat ini. Lanjutkan?")) {
-          localStorage.setItem('finansialku_app_data', JSON.stringify(json));
-          window.location.reload(); 
-        }
-      } catch (err) {
-        alert("File tidak valid!");
-      }
+      try { const json = JSON.parse(e.target.result); if (window.confirm("Import data akan menimpa data saat ini. Lanjutkan?")) { localStorage.setItem('finansialku_app_data', JSON.stringify(json)); window.location.reload(); } } 
+      catch (err) { alert("File tidak valid!"); }
     };
   };
 
-  // --- DOWNLOAD EXCEL MULTI-SHEET (BARU) ---
   const downloadExcel = () => {
-    let runningBalance = 0;
-    let no = 1;
-    const transactions = [];
-
-    // 1. Kumpulkan Pemasukan
-    (currentMonthData.incomes || []).forEach(inc => {
-      runningBalance += inc.amount;
-      transactions.push([no++, "-", inc.name, "Pemasukan", inc.amount, 0, runningBalance]);
-    });
-
-    // 2. Kumpulkan Pengeluaran (Urut berdasarkan tanggal)
+    let runningBalance = 0; let no = 1; const transactions = [];
+    (currentMonthData.incomes || []).forEach(inc => { runningBalance += inc.amount; transactions.push([no++, "-", inc.name, "Pemasukan", inc.amount, 0, runningBalance]); });
     const sortedExpenses = [...(currentMonthData.expenses || [])].sort((a,b) => new Date(a.date) - new Date(b.date));
-    sortedExpenses.forEach(exp => {
-      runningBalance -= exp.amount;
-      transactions.push([no++, exp.date, exp.name, "Pengeluaran", 0, exp.amount, runningBalance]);
-    });
+    sortedExpenses.forEach(exp => { runningBalance -= exp.amount; transactions.push([no++, exp.date, exp.name, "Pengeluaran", 0, exp.amount, runningBalance]); });
+    
+    const ws1 = XLSX.utils.aoa_to_sheet([[`Catatan Keuangan Periode ${formatMonthDisplay(selectedMonth)}`], [], ["No", "Tanggal", "Keterangan", "Kategori", "Pemasukan (Rp)", "Pengeluaran (Rp)", "Saldo"], ...transactions]);
 
-    // 3. Buat Sheet 1 (Catatan Keuangan)
-    const title1 = [[`Catatan Keuangan Periode ${formatMonthDisplay(selectedMonth)}`]];
-    const header1 = [["No", "Tanggal", "Keterangan", "Kategori", "Pemasukan (Rp)", "Pengeluaran (Rp)", "Saldo"]];
-    const ws1 = XLSX.utils.aoa_to_sheet([...title1, [], ...header1, ...transactions]);
+    const ws2 = XLSX.utils.aoa_to_sheet([
+        ["Catatan Aset dan Investasi"], [],
+        ["--- TABEL A: ASET APRESIASI (NILAI NAIK) ---"], ["No", "Nama Aset", "Nilai (Rp)"],
+        ...appreciationAssets.map((a, i) => [i + 1, a.name, a.amount]),
+        [],
+        ["--- TABEL B: ASET DEPRESIASI (NILAI TURUN) ---"], ["No", "Nama Aset", "Nilai (Rp)"],
+        ...depreciationAssets.map((a, i) => [i + 1, a.name, a.amount])
+    ]);
 
-    // 4. Buat Sheet 2 (Catatan Aset)
-    const title2 = [["Catatan Aset dan Investasi"]];
-    const header2 = [["No", "Nama Aset", "Nilai (Rp)"]];
-    const assetData = assets.map((a, i) => [i + 1, a.name, a.amount]);
-    const ws2 = XLSX.utils.aoa_to_sheet([...title2, [], ...header2, ...assetData]);
-
-    // 5. Gabungkan menjadi 1 file Excel
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws1, "Bulan Ini");
-    XLSX.utils.book_append_sheet(wb, ws2, "Aset & Investasi");
-
-    // 6. Download!
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws1, "Bulan Ini"); XLSX.utils.book_append_sheet(wb, ws2, "Aset & Investasi");
     XLSX.writeFile(wb, `Laporan_Finansialku_${selectedMonth}.xlsx`);
   };
 
-  const handleCopy = (text) => {
-    navigator.clipboard.writeText(text);
-    setCopiedText(text);
-    setTimeout(() => setCopiedText(null), 2000); 
-  };
+  const handleCopy = (text) => { navigator.clipboard.writeText(text); setCopiedText(text); setTimeout(() => setCopiedText(null), 2000); };
 
   const headerBaseClass = "text-white p-5 shadow-lg rounded-b-3xl transition-colors duration-300";
   const headerClass = activeTab === 'aset' && isPro ? `${headerBaseClass} bg-night border-b border-lavender/10` : `${headerBaseClass} bg-twilight`;
@@ -270,11 +229,8 @@ export default function App() {
                           <p className="text-[10px] uppercase font-extrabold text-twilight/70 mb-1.5 tracking-wider">Transfer Bank:</p>
                           {bankAccounts.map((b, i) => (
                             <div key={i} className="mb-2 last:mb-0 bg-white/50 p-2 rounded-lg border border-white flex justify-between items-center group">
-                              <div>
-                                <p><span className="font-bold text-night">{b.bank}</span> - <span className="font-mono text-twilight font-bold text-base">{b.norek}</span></p>
-                                <p className="text-[10px] text-gray-600">a.n {b.nama}</p>
-                              </div>
-                              <button onClick={() => handleCopy(b.norek)} className="p-2 bg-lavender/50 text-twilight rounded-lg hover:bg-twilight hover:text-white transition-colors" title="Salin Nomor Rekening">
+                              <div><p><span className="font-bold text-night">{b.bank}</span> - <span className="font-mono text-twilight font-bold text-base">{b.norek}</span></p><p className="text-[10px] text-gray-600">a.n {b.nama}</p></div>
+                              <button onClick={() => handleCopy(b.norek)} className="p-2 bg-lavender/50 text-twilight rounded-lg hover:bg-twilight hover:text-white transition-colors">
                                 {copiedText === b.norek ? <CheckCircle2 size={16} className="text-green-500" /> : <Copy size={16} />}
                               </button>
                             </div>
@@ -285,11 +241,8 @@ export default function App() {
                           <div className="space-y-1.5">
                             {eWallets.map((e, i) => (
                               <div key={i} className="flex justify-between items-center bg-white/50 p-2 rounded-lg border border-white group">
-                                <div className="flex flex-col">
-                                  <span className="font-bold text-night text-xs">{e.nama}</span>
-                                  <span className="font-mono text-twilight font-bold">{e.no}</span>
-                                </div>
-                                <button onClick={() => handleCopy(e.no)} className="p-2 bg-lavender/50 text-twilight rounded-lg hover:bg-twilight hover:text-white transition-colors" title={`Salin Nomor ${e.nama}`}>
+                                <div className="flex flex-col"><span className="font-bold text-night text-xs">{e.nama}</span><span className="font-mono text-twilight font-bold">{e.no}</span></div>
+                                <button onClick={() => handleCopy(e.no)} className="p-2 bg-lavender/50 text-twilight rounded-lg hover:bg-twilight hover:text-white transition-colors">
                                   {copiedText === e.no ? <CheckCircle2 size={16} className="text-green-500" /> : <Copy size={16} />}
                                 </button>
                               </div>
@@ -316,7 +269,7 @@ export default function App() {
                     <div className="w-full">
                       <p className="text-sm font-bold text-night mb-1">Masukkan Kode</p>
                       <div className="flex gap-2 mt-2">
-                        <input type="text" placeholder="Ketik Kode (Cth: YES26)" className="w-full px-3 py-2 border border-gray-300 rounded-xl outline-none text-sm uppercase bg-slate-50 focus:ring-2 focus:ring-twilight" value={activationCode} onChange={e => setActivationCode(e.target.value)} />
+                        <input type="text" placeholder="Ketik Kode" className="w-full px-3 py-2 border border-gray-300 rounded-xl outline-none text-sm uppercase bg-slate-50 focus:ring-2 focus:ring-twilight" value={activationCode} onChange={e => setActivationCode(e.target.value)} />
                         <button onClick={handleActivateCode} className="bg-twilight text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-night transition-colors shadow-sm">Aktifkan</button>
                       </div>
                     </div>
@@ -338,13 +291,9 @@ export default function App() {
           
           <header className={headerClass}>
             <div className="flex justify-between items-start mb-3">
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                  {/* LOGO BARU DIPASANG DI SINI */}
-                  <img src="/logo.jpeg" alt="Finansialku Logo" className="w-8 h-8 rounded-lg shadow-sm object-cover bg-white" />
-                  Finansialku
-                </h1>
-                <p className="text-lavender text-xs mt-0.5 opacity-90 transition-opacity">Asisten Keuangan Pintar</p>
+              <div className="flex items-center gap-2.5">
+                <img src="/logo.jpeg" alt="Finansialku Logo" className="w-8 h-8 rounded-lg shadow-sm object-cover bg-white" />
+                <div><h1 className="text-2xl font-bold tracking-tight">Finansialku</h1><p className="text-lavender text-xs mt-[-2px] opacity-90 transition-opacity">Asisten Keuangan Pintar</p></div>
               </div>
               {userTier === 'pro' ? (
                  <div className={`flex items-center text-[10px] font-bold px-2 py-1 rounded-full shadow-md transition-colors ${activeTab === 'aset' ? 'bg-lavender text-night' : 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-white'}`}><Crown size={12} className="mr-1"/> PRO</div>
@@ -368,9 +317,7 @@ export default function App() {
             <div className="m-4 bg-red-50 p-4 border border-red-200 rounded-2xl flex flex-col gap-2">
               <div className="flex items-center text-red-600 font-bold"><Lock size={18} className="mr-2"/> Input Dikunci (Trial Habis)</div>
               <p className="text-xs text-red-700 mb-2">Bantu kreator mengembangkan aplikasi ini dan buka akses selamanya!</p>
-              <button onClick={() => setShowUpgradeModal(true)} className="w-full bg-twilight text-white text-xs py-3 rounded-xl font-bold hover:bg-night transition shadow-md flex items-center justify-center">
-                 Lihat Opsi Upgrade / Pembayaran
-              </button>
+              <button onClick={() => setShowUpgradeModal(true)} className="w-full bg-twilight text-white text-xs py-3 rounded-xl font-bold hover:bg-night transition shadow-md flex items-center justify-center">Lihat Opsi Upgrade / Pembayaran</button>
             </div>
           )}
 
@@ -387,10 +334,11 @@ export default function App() {
                     <div><p className="text-lavender text-xs flex items-center"><TrendingDown size={14} className="mr-1"/> Pengeluaran</p><p className="font-semibold text-sm">{formatRp(totalExpenses)}</p></div>
                   </div>
                 </div>
-                {/* TOMBOL DOWNLOAD EXCEL BARU */}
+                
                 <button onClick={downloadExcel} disabled={isExpired} className="w-full bg-white border border-lavender/50 text-twilight py-3 rounded-2xl font-bold text-xs shadow-sm hover:bg-slate-50 transition mb-4 flex items-center justify-center disabled:opacity-50">
                   <Download size={16} className="mr-2" /> Download Laporan Excel (Multi-Sheet)
                 </button>
+                
                 <div>
                   <h3 className="text-md font-bold mb-3 text-night">Sumber Pemasukan</h3>
                   <div className={`bg-white rounded-2xl p-4 border ${isExpired ? 'border-red-200 opacity-60' : 'border-lavender/40'} shadow-sm mb-3 relative`}>
@@ -431,21 +379,14 @@ export default function App() {
                       </div>
                     ))}
                   </div>
-                  <div className="mt-8 p-4 bg-slate-100 rounded-2xl border border-dashed border-gray-300">
-                    <h3 className="text-xs font-bold text-night mb-2 flex items-center tracking-tight">
-                      <Download size={14} className="mr-1.5" /> KEAMANAN DATA (BACKUP)
-                    </h3>
-                    <p className="text-[10px] text-gray-500 mb-3 leading-relaxed">
-                      Data Anda tersimpan di HP ini. Lakukan backup berkala agar data tidak hilang jika cache browser dihapus.
-                    </p>
+                  
+                  {/* BACKUP DATA */}
+                  <div className="mt-8 p-4 bg-slate-100 rounded-2xl border border-dashed border-gray-300 text-center">
+                    <Download size={14} className="mx-auto mb-1 text-gray-400"/>
+                    <p className="text-[10px] text-gray-500 mb-2">Data tersimpan aman di HP-mu. Backup berkala!</p>
                     <div className="flex gap-2">
-                      <button onClick={exportData} className="flex-1 bg-white border border-gray-300 text-night py-2 rounded-xl text-[10px] font-bold shadow-sm hover:bg-slate-50 transition">
-                        Ekspor (Download)
-                      </button>
-                      <label className="flex-1 bg-white border border-gray-300 text-night py-2 rounded-xl text-[10px] font-bold shadow-sm hover:bg-slate-50 transition cursor-pointer text-center">
-                        Impor (Upload)
-                        <input type="file" accept=".json" onChange={importData} className="hidden" />
-                      </label>
+                      <button onClick={exportData} className="flex-1 bg-white border border-gray-300 text-night py-2 rounded-xl text-[10px] font-bold">Ekspor (Download)</button>
+                      <label className="flex-1 bg-white border border-gray-300 text-night py-2 rounded-xl text-[10px] font-bold cursor-pointer text-center">Impor<input type="file" accept=".json" onChange={importData} className="hidden" /></label>
                     </div>
                   </div>
                 </div>
@@ -521,17 +462,12 @@ export default function App() {
               <div className="animate-in fade-in space-y-5">
                 <h2 className="text-lg font-bold text-night flex items-center"><Target className="mr-2 text-dusky" size={20} /> Proyeksi Bulan Depan</h2>
                 
-                {/* --- KOTAK SISA GAJI DENGAN FITUR EDIT MANUAL --- */}
                 <div className="bg-gradient-to-br from-dusky to-midnight rounded-2xl p-5 text-white shadow-lg text-center relative overflow-hidden">
                   <div className="absolute -top-4 -right-4 opacity-10"><CalendarDays size={120} /></div>
                   <div className="flex justify-center items-center gap-2 relative z-10 mb-1">
                     <p className="text-lavender text-sm mb-0">Estimasi Sisa Gaji Bulan Depan</p>
                     {!isExpired && (
-                      <button onClick={() => {
-                          setIsEditingProj(!isEditingProj);
-                          // Otomatis tarik angka sistem saat mau diedit agar tidak nol
-                          if (!isEditingProj && manualProjBalance === null) setManualProjBalance(projBalance);
-                        }} 
+                      <button onClick={() => { setIsEditingProj(!isEditingProj); if (!isEditingProj && manualProjBalance === null) setManualProjBalance(projBalance); }} 
                         className="text-lavender hover:text-white bg-white/10 p-1.5 rounded-md transition" title="Edit Manual">
                         <Edit2 size={12}/>
                       </button>
@@ -542,23 +478,16 @@ export default function App() {
                     <div className="flex items-center justify-center gap-2 mt-2 relative z-10">
                       <div className="relative flex items-center">
                         <span className="absolute left-3 text-white/70 text-sm font-bold">Rp</span>
-                        <input type="text" 
-                               className="w-40 pl-9 pr-3 py-1.5 rounded bg-white/20 text-white font-bold text-left border border-lavender/50 outline-none focus:ring-2 focus:ring-lavender"
+                        <input type="text" className="w-40 pl-9 pr-3 py-1.5 rounded bg-white/20 text-white font-bold text-left border border-lavender/50 outline-none focus:ring-2 focus:ring-lavender"
                                value={manualProjBalance === 0 ? '' : (manualProjBalance || 0).toLocaleString('id-ID')} 
-                               onChange={e => setManualProjBalance(Number(e.target.value.replace(/\D/g, '')))} 
-                               placeholder="0"
-                               autoFocus />
+                               onChange={e => setManualProjBalance(Number(e.target.value.replace(/\D/g, '')))} placeholder="0" autoFocus />
                       </div>
-                      <button onClick={() => {setManualProjBalance(null); setIsEditingProj(false);}} className="text-[10px] bg-red-500/80 px-2 py-2 rounded font-bold hover:bg-red-500 transition shadow-sm">
-                        Reset Auto
-                      </button>
+                      <button onClick={() => {setManualProjBalance(null); setIsEditingProj(false);}} className="text-[10px] bg-red-500/80 px-2 py-2 rounded font-bold hover:bg-red-500 transition shadow-sm">Reset Auto</button>
                     </div>
                   ) : (
                     <h3 className={`text-3xl font-bold relative z-10 transition-colors ${displayedProjBalance < 0 ? 'text-red-300' : 'text-white'}`}>
                       {formatRp(displayedProjBalance)}
-                      {manualProjBalance !== null && (
-                        <span className="text-[9px] ml-2 align-middle bg-yellow-500/90 text-white px-1.5 py-0.5 rounded shadow-sm tracking-wide">EDITED</span>
-                      )}
+                      {manualProjBalance !== null && <span className="text-[9px] ml-2 align-middle bg-yellow-500/90 text-white px-1.5 py-0.5 rounded shadow-sm tracking-wide">EDITED</span>}
                     </h3>
                   )}
                 </div>
@@ -596,55 +525,74 @@ export default function App() {
                   <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-2xl border border-yellow-200 text-center shadow-sm">
                     <Crown size={40} className="mx-auto text-yellow-500 mb-3" />
                     <h3 className="font-bold text-night mb-2">Fitur Khusus Pengguna PRO</h3>
-                    <p className="text-xs text-gray-600 mb-4 leading-relaxed">Pantau pertumbuhan hartamu! Catat tabungan, emas, deposito, dan aset lainnya di satu tempat.</p>
+                    <p className="text-xs text-gray-600 mb-4 leading-relaxed">Pantau pertumbuhan hartamu! Catat aset yang Apresiasi dan Depresiasi.</p>
                     <button onClick={() => setShowUpgradeModal(true)} className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 text-white py-3 rounded-xl font-bold shadow-md hover:scale-105 transition">Upgrade ke PRO Sekarang</button>
                   </div>
                 ) : (
                   <>
-                    <div className="bg-gradient-to-br from-white to-lavender rounded-3xl p-6 text-night shadow-2xl relative overflow-hidden border border-lavender/30">
-                      <div className="absolute -top-4 -right-4 opacity-50"><Coins size={140} className="text-night/80"/></div>
-                      <p className="text-twilight text-sm font-medium mb-1 relative z-10 opacity-80 flex items-center gap-1.5"><Sparkles size={14} className="text-twilight animate-pulse"/>Total Harta </p>
+                    <div className="bg-gradient-to-br from-midnight to-black rounded-3xl p-6 text-white shadow-2xl border border-white/10 overflow-hidden relative">
+                      <div className="absolute top-0 right-0 opacity-10"><Sparkles size={160} className="text-lavender"/></div>
+                      <p className="text-lavender text-sm font-medium opacity-80 flex items-center gap-1.5"><Coins size={14} className="animate-pulse"/>Net Worth (Harta Brankas)</p>
                       <h3 className="text-3xl font-extrabold relative z-10 transition-all">{formatRp(totalAssets)}</h3>
-                      <div className="flex items-center gap-1 text-xs text-twilight opacity-70 mt-1 relative z-10 font-medium">Aset aman tersimpan di brankas digital <Unlock size={10} className="ml-1"/></div>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-4 pt-4 border-t border-lavender/10 text-lavender/80 relative z-10 text-xs">
+                        <p className="flex justify-between items-center"><span className="flex items-center"><TrendingUp size={12} className="mr-1 text-green-300"/>Apresiasi:</span> <span className="text-green-200 font-semibold">{formatRp(totalAppreciation)}</span></p>
+                        <p className="flex justify-between items-center"><span className="flex items-center"><TrendingDown size={12} className="mr-1 text-red-300"/>Depresiasi:</span> <span className="text-red-200 font-semibold">{formatRp(totalDepreciation)}</span></p>
+                      </div>
                     </div>
+
                     <div className="bg-white rounded-2xl p-4 border border-lavender shadow-sm transition-all hover:border-lavender/60">
                       <h3 className="text-sm font-bold text-night mb-3">Tambah Portofolio Aset</h3>
-                      <div className="flex flex-col sm:flex-row gap-2.5 mb-3.5">
-                        <input type="text" placeholder="Nama (Cth: Tabungan Olshop)" className="w-full px-3.5 py-2.5 border rounded-xl outline-none text-sm bg-slate-50 focus:ring-2 focus:ring-twilight border-slate-100 transition-all" value={newAssetName} onChange={e => setNewAssetName(e.target.value)} />
-                        <CurrencyInput placeholder="Nilai Saat Ini" value={newAssetAmount} onChange={setNewAssetAmount} noMargin={true} />
+                      <input type="text" placeholder="Nama (Cth: Emas, Mobil)" className="w-full px-3.5 py-2.5 mb-3 border rounded-xl outline-none text-sm bg-slate-50 focus:ring-2 focus:ring-twilight border-slate-100 transition-all" value={newAssetName} onChange={e => setNewAssetName(e.target.value)} />
+                      <CurrencyInput placeholder="Nilai Saat Ini" value={newAssetAmount} onChange={setNewAssetAmount} noMargin={true} />
+                      
+                      <div className="grid grid-cols-2 gap-2 mt-4 mb-3.5">
+                        <button onClick={() => setNewAssetType('apresiasi')} className={`py-3 rounded-xl flex items-center justify-center gap-1.5 border-2 text-xs font-bold transition ${newAssetType === 'apresiasi' ? 'bg-green-50 text-green-700 border-green-300' : 'bg-slate-50 border-slate-100 text-gray-500 hover:border-green-100'}`}>
+                          <TrendingUp size={16} /> Apresiasi (Naik)
+                        </button>
+                        <button onClick={() => setNewAssetType('depresiasi')} className={`py-3 rounded-xl flex items-center justify-center gap-1.5 border-2 text-xs font-bold transition ${newAssetType === 'depresiasi' ? 'bg-red-50 text-red-700 border-red-300' : 'bg-slate-50 border-slate-100 text-gray-500 hover:border-red-100'}`}>
+                          <Car size={16} /> Depresiasi (Turun)
+                        </button>
                       </div>
+
                       <button onClick={addAsset} className="w-full bg-lavender text-twilight py-3 rounded-xl font-bold text-xs hover:bg-twilight hover:text-white transition-colors shadow-sm">+ Simpan Aset ke Brankas</button>
                     </div>
-                    <div className="space-y-3">
-                      {assets.length === 0 ? <p className="text-center text-xs text-gray-400 py-6 italic bg-white rounded-xl border border-lavender/30">Belum ada aset yang dicatat. Mulai catat hartamu!</p> :
-                        assets.map(as => (
-                          <div key={as.id} className="flex flex-col p-4 bg-white border border-slate-100 rounded-xl shadow-sm text-sm transition-all hover:border-lavender relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 w-1 h-full bg-twilight opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                            <div className="flex justify-between items-center mb-1.5">
-                              <span className="font-bold text-night flex items-center"><Landmark size={14} className="mr-2 text-night transition-colors group-hover:text-twilight"/>{as.name}</span>
-                              <span className="font-bold text-night text-lg transition-colors group-hover:text-twilight">{formatRp(as.amount)}</span>
-                            </div>
-                            <div className="flex justify-end items-center gap-3.5 mt-2.5 pt-2.5 border-t border-gray-50 relative z-10">
-                                <button onClick={() => {setWithdrawAssetId(as.id); setWithdrawAssetVal(0); setEditAssetId(null);}} className="text-xs font-bold text-twilight hover:text-black flex items-center p-1 rounded transition-colors duration-200"><Banknote size={14} className="mr-1.5"/> Tarik ke Bulan Ini</button>
-                                <button onClick={() => {setEditAssetId(as.id); setEditAssetVal(as.amount); setWithdrawAssetId(null);}} className="text-xs font-bold text-twilight hover:text-black flex items-center p-1 rounded transition-colors duration-200"><Edit2 size={14} className="mr-1.5"/> Edit Nominal</button>
-                                <button onClick={() => removeAsset(as.id)} className="text-gray-300 hover:text-red-500 transition-colors p-1"><Trash2 size={16} /></button>
-                            </div>
-                            {editAssetId === as.id && (
-                              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 animate-in fade-in transition-all">
-                                 <div className="flex-1"><CurrencyInput noMargin={true} placeholder="Nominal Baru" value={editAssetVal} onChange={setEditAssetVal} /></div>
-                                 <button onClick={() => { setAssets(assets.map(a => a.id === as.id ? {...a, amount: editAssetVal} : a)); setEditAssetId(null); }} className="bg-twilight text-white px-3.5 py-3 rounded-xl text-xs font-bold hover:bg-black transition-colors shadow-sm">Update</button>
-                                 <button onClick={() => setEditAssetId(null)} className="bg-slate-100 text-gray-600 px-3.5 py-3 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors">Batal</button>
-                              </div>
-                            )}
-                            {withdrawAssetId === as.id && (
-                              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100 animate-in fade-in transition-all">
-                                 <div className="flex-1"><CurrencyInput noMargin={true} placeholder="Berapa yg ditarik?" value={withdrawAssetVal} onChange={setWithdrawAssetVal} /></div>
-                                 <button onClick={() => handleWithdrawAsset(as)} className="bg-twilight text-white px-3.5 py-3 rounded-xl text-xs font-bold hover:bg-black transition-colors shadow-sm">Tarik</button>
-                                 <button onClick={() => setWithdrawAssetId(null)} className="bg-slate-100 text-gray-600 px-3.5 py-3 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors">Batal</button>
-                              </div>
-                            )}
+
+                    <div className="p-4 bg-white rounded-3xl border border-green-100 shadow-sm hover:border-green-200 transition">
+                      <div className="flex justify-between items-center mb-4 pb-2 border-b border-green-50">
+                        <h3 className="font-extrabold text-night flex items-center gap-2"><TrendingUp size={20} className="text-green-500"/>APRESIASI (Nilai Naik)</h3>
+                        <span className="font-bold text-lg text-green-700">{formatRp(totalAppreciation)}</span>
+                      </div>
+                      {appreciationAssets.length === 0 ? <p className="text-center text-xs text-gray-400 py-4 italic">Belum ada aset apresiasi.</p> :
+                        appreciationAssets.map(as => (
+                          <div key={as.id} className="p-3 mb-2 bg-green-50/50 border border-green-100 rounded-xl shadow-sm text-sm group flex justify-between items-center relative">
+                             <div className="flex flex-col">
+                               <span className="font-bold text-night">{as.name}</span>
+                               <span className="font-extrabold text-green-800 text-sm mt-0.5">{formatRp(as.amount)}</span>
+                             </div>
+                             <div className="flex flex-col gap-2">
+                               <button onClick={() => removeAsset(as.id)} className="text-red-400 hover:text-red-600 transition p-1"><Trash2 size={16}/></button>
+                             </div>
                           </div>
-                      ))}
+                        ))}
+                    </div>
+
+                    <div className="p-4 bg-white rounded-3xl border border-lavender shadow-sm hover:border-lavender/60 transition">
+                      <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100">
+                        <h3 className="font-extrabold text-night flex items-center gap-2"><Car size={20} className="text-lavender"/>DEPRESIASI (Nilai Turun)</h3>
+                        <span className="font-bold text-lg text-lavender">{formatRp(totalDepreciation)}</span>
+                      </div>
+                      {depreciationAssets.length === 0 ? <p className="text-center text-xs text-gray-400 py-4 italic">Belum ada aset depresiasi.</p> :
+                        depreciationAssets.map(as => (
+                          <div key={as.id} className="p-3 mb-2 bg-slate-50 border border-slate-100 rounded-xl shadow-sm text-sm group flex justify-between items-center relative">
+                             <div className="flex flex-col">
+                               <span className="font-bold text-night">{as.name}</span>
+                               <span className="font-extrabold text-lavender text-sm mt-0.5">{formatRp(as.amount)}</span>
+                             </div>
+                             <div className="flex flex-col gap-2">
+                               <button onClick={() => removeAsset(as.id)} className="text-red-400 hover:text-red-600 transition p-1"><Trash2 size={16}/></button>
+                             </div>
+                          </div>
+                        ))}
                     </div>
                   </>
                 )}
