@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Wallet, Calculator, Calendar, Plus, Trash2, Edit2, TrendingDown, TrendingUp, Target, CheckCircle2, Download, CalendarDays, Lock, Unlock, Sparkles, Coins, Landmark, Crown, Banknote, X, MessageCircle, Copy, Car, ArrowUpRight } from 'lucide-react';
+import { Wallet, Calculator, Calendar, Plus, Trash2, Edit2, TrendingDown, TrendingUp, Target, CheckCircle2, Download, CalendarDays, Lock, Unlock, Sparkles, Coins, Landmark, Crown, Banknote, X, MessageCircle, Copy, Car, ArrowUpRight, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx-js-style';
 
 const formatRp = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number || 0);
@@ -8,6 +8,15 @@ const formatProfit = (number) => number > 0 ? `+ ${formatExcelNum(number)}` : (n
 
 const getTodayDate = () => new Date().toISOString().split('T')[0];
 const getCurrentMonthKey = () => `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
+const getPreviousMonthKey = (monthKey) => {
+  if (!monthKey) return '';
+  let [year, month] = monthKey.split('-').map(Number);
+  month -= 1;
+  if (month === 0) { month = 12; year -= 1; }
+  return `${year}-${String(month).padStart(2, '0')}`;
+};
+
 const formatMonthDisplay = (monthKey) => {
   if (!monthKey) return '';
   const [year, month] = monthKey.split('-');
@@ -21,7 +30,14 @@ const CurrencyInput = ({ value, onChange, label, placeholder, icon: Icon, disabl
       {label && <label className="text-[13px] font-bold text-night mb-1.5">{label}</label>}
       <div className="relative flex items-center">
         <span className={`absolute left-3.5 font-medium text-sm ${disabled ? 'text-gray-400' : 'text-gray-500'}`}>Rp</span>
-        <input type="text" disabled={disabled} className={`w-full pl-11 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${disabled ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-gray-200 focus:bg-lavender/30 focus:ring-2 focus:ring-twilight text-gray-800'}`} value={value === 0 ? '' : value.toLocaleString('id-ID')} onChange={handleChange} placeholder={placeholder} />
+        <input 
+          type="text" 
+          disabled={disabled} 
+          className={`w-full pl-11 pr-4 py-2.5 border rounded-xl outline-none transition-all text-sm ${disabled ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed' : 'bg-white border-gray-200 focus:bg-lavender/30 focus:ring-2 focus:ring-twilight text-gray-800'}`} 
+          value={value === 0 ? '' : value.toLocaleString('id-ID')} 
+          onChange={handleChange} 
+          placeholder={placeholder} 
+        />
         {Icon && <Icon className="absolute right-3.5 text-gray-400" size={18} />}
       </div>
     </div>
@@ -40,10 +56,18 @@ export default function App() {
   const [userTier, setUserTier] = useState(savedData?.userTier || 'free'); 
   const [daysUsed, setDaysUsed] = useState(0);
 
-  useEffect(() => { setDaysUsed(Math.floor(Math.abs(new Date() - new Date(firstOpenDate)) / (1000 * 60 * 60 * 24))); }, [firstOpenDate]);
+  const [lastBackupDate, setLastBackupDate] = useState(savedData?.lastBackupDate || new Date().toISOString());
+  const [backupEmail, setBackupEmail] = useState(savedData?.backupEmail || '');
+
+  useEffect(() => { 
+    setDaysUsed(Math.floor(Math.abs(new Date() - new Date(firstOpenDate)) / (1000 * 60 * 60 * 24))); 
+  }, [firstOpenDate]);
 
   const isExpired = daysUsed > 80 && userTier === 'free';
   const isPro = userTier === 'pro';
+
+  const daysSinceBackup = Math.floor(Math.abs(new Date() - new Date(lastBackupDate)) / (1000 * 60 * 60 * 24));
+  const needsBackup = daysSinceBackup >= 30; 
 
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey());
   const [monthlyData, setMonthlyData] = useState(savedData?.monthlyData || { [getCurrentMonthKey()]: { incomes: [], expenses: [] } });
@@ -53,15 +77,12 @@ export default function App() {
   const [newExpName, setNewExpName] = useState(''); const [newExpAmount, setNewExpAmount] = useState(0); const [newExpDate, setNewExpDate] = useState(getTodayDate());
   
   const [simItemPrice, setSimItemPrice] = useState(0); const [simDP, setSimDP] = useState(0); const [simTenor, setSimTenor] = useState(12);
-  const [simInputType, setSimInputType] = useState('interest'); 
-  const [simInterestInput, setSimInterestInput] = useState(0); 
-  const [simCicilanInput, setSimCicilanInput] = useState(0); 
+  const [simInputType, setSimInputType] = useState('interest'); const [simInterestInput, setSimInterestInput] = useState(0); const [simCicilanInput, setSimCicilanInput] = useState(0); 
 
   const [projOrangTua, setProjOrangTua] = useState(savedData?.projOrangTua || 0); const [projCicilan, setProjCicilan] = useState(savedData?.projCicilan || 0);
   const [projExpenses, setProjExpenses] = useState(savedData?.projExpenses || []); const [newProjExpName, setNewProjExpName] = useState(''); const [newProjExpAmount, setNewProjExpAmount] = useState(0);
   
-  const [isEditingProj, setIsEditingProj] = useState(false); 
-  const [manualProjBalance, setManualProjBalance] = useState(savedData?.manualProjBalance || null);
+  const [isEditingProj, setIsEditingProj] = useState(false); const [manualProjBalance, setManualProjBalance] = useState(savedData?.manualProjBalance || null);
 
   const [assets, setAssets] = useState(savedData?.assets || []);
   const [newAssetType, setNewAssetType] = useState('apresiasi'); 
@@ -70,10 +91,8 @@ export default function App() {
   const [newAssetUnit, setNewAssetUnit] = useState(1);
   const [newAssetBuyPrice, setNewAssetBuyPrice] = useState(0);
   
-  const [editAssetId, setEditAssetId] = useState(null); 
-  const [editAssetVal, setEditAssetVal] = useState(0);
-  const [withdrawAssetId, setWithdrawAssetId] = useState(null); 
-  const [withdrawAssetVal, setWithdrawAssetVal] = useState(0);
+  const [editAssetId, setEditAssetId] = useState(null); const [editAssetVal, setEditAssetVal] = useState(0);
+  const [withdrawAssetId, setWithdrawAssetId] = useState(null); const [withdrawAssetVal, setWithdrawAssetVal] = useState(0);
 
   const appreciationAssets = useMemo(() => assets.filter(a => a.type === 'apresiasi' || !a.type), [assets]);
   const depreciationAssets = useMemo(() => assets.filter(a => a.type === 'depresiasi'), [assets]);
@@ -93,27 +112,32 @@ export default function App() {
   const [activationCode, setActivationCode] = useState('');
   const [copiedText, setCopiedText] = useState(null);
 
-  const bankAccounts = [
-    { bank: "BCA", norek: "0182364981", nama: "Setiya Wulandari" },
-    { bank: "SEABANK", norek: "901548485318", nama: "Setiya Wulandari" }
-  ];
-  const eWallets = [
-    { nama: "ShopeePay", no: "085259399968" },
-    { nama: "GoPay", no: "085259399968" }
-  ];
+  const bankAccounts = [{ bank: "BCA", norek: "0182364981", nama: "Setiya Wulandari" }, { bank: "SEABANK", norek: "901548485318", nama: "Setiya Wulandari" }];
+  const eWallets = [{ nama: "ShopeePay", no: "085259399968" }, { nama: "GoPay", no: "085259399968" }];
   const noWhatsApp = "6285259399968"; 
 
   useEffect(() => {
-    localStorage.setItem('finansialku_app_data', JSON.stringify({ monthlyData, projOrangTua, projCicilan, projExpenses, assets, firstOpenDate, userTier, manualProjBalance }));
-  }, [monthlyData, projOrangTua, projCicilan, projExpenses, assets, firstOpenDate, userTier, manualProjBalance]);
+    localStorage.setItem('finansialku_app_data', JSON.stringify({ monthlyData, projOrangTua, projCicilan, projExpenses, assets, firstOpenDate, userTier, manualProjBalance, lastBackupDate, backupEmail }));
+  }, [monthlyData, projOrangTua, projCicilan, projExpenses, assets, firstOpenDate, userTier, manualProjBalance, lastBackupDate, backupEmail]);
+
+  const previousBalance = useMemo(() => {
+    let prevIncomes = 0; let prevExpenses = 0;
+    Object.keys(monthlyData).forEach(monthKey => {
+      if (monthKey < selectedMonth) {
+        const mData = monthlyData[monthKey];
+        prevIncomes += (mData.incomes || []).reduce((a, b) => a + b.amount, 0);
+        prevExpenses += (mData.expenses || []).reduce((a, b) => a + b.amount, 0);
+      }
+    });
+    return prevIncomes - prevExpenses;
+  }, [monthlyData, selectedMonth]);
 
   const totalIncomes = useMemo(() => currentMonthData.incomes?.reduce((a, b) => a + b.amount, 0) || 0, [currentMonthData.incomes]);
   const totalExpenses = useMemo(() => currentMonthData.expenses?.reduce((a, b) => a + b.amount, 0) || 0, [currentMonthData.expenses]);
-  const currentBalance = totalIncomes - totalExpenses;
-  
+  const currentBalance = previousBalance + totalIncomes - totalExpenses;
   const totalAssets = totalAppreciation + totalDepreciation;
   
-  const baseProjIncome = manualProjBalance !== null ? manualProjBalance : totalIncomes;
+  const baseProjIncome = manualProjBalance !== null ? manualProjBalance : currentBalance;
   const displayedProjBalance = baseProjIncome - projOrangTua - projCicilan - projExpenses.reduce((a, b) => a + b.amount, 0);
 
   const simResult = useMemo(() => {
@@ -121,16 +145,11 @@ export default function App() {
     let cicilanFinal = 0; let bungaTahunanFinal = 0; let totalBungaNominal = 0;
     if (simTenor > 0 && pokok > 0) {
       if (simInputType === 'interest') {
-        bungaTahunanFinal = simInterestInput;
-        totalBungaNominal = pokok * (bungaTahunanFinal / 100) * (simTenor / 12);
-        cicilanFinal = (pokok + totalBungaNominal) / simTenor;
+        bungaTahunanFinal = simInterestInput; totalBungaNominal = pokok * (bungaTahunanFinal / 100) * (simTenor / 12); cicilanFinal = (pokok + totalBungaNominal) / simTenor;
       } else {
-        cicilanFinal = simCicilanInput;
-        const cicilanMinimal = pokok / simTenor; 
-        if (cicilanFinal > cicilanMinimal) {
-          totalBungaNominal = (cicilanFinal * simTenor) - pokok;
-          bungaTahunanFinal = (totalBungaNominal / pokok) / (simTenor / 12) * 100;
-        } else { totalBungaNominal = 0; bungaTahunanFinal = 0; }
+        cicilanFinal = simCicilanInput; const cicilanMinimal = pokok / simTenor; 
+        if (cicilanFinal > cicilanMinimal) { totalBungaNominal = (cicilanFinal * simTenor) - pokok; bungaTahunanFinal = (totalBungaNominal / pokok) / (simTenor / 12) * 100; } 
+        else { totalBungaNominal = 0; bungaTahunanFinal = 0; }
       }
     }
     const totalDibayar = simDP + pokok + totalBungaNominal;
@@ -150,18 +169,20 @@ export default function App() {
   
   const addAsset = () => { 
     if (isPro && newAssetName && newAssetBuyPrice > 0) { 
-      const newAsset = {
-        id: Date.now(),
-        type: newAssetType,
-        name: newAssetName,
-        category: newAssetType === 'apresiasi' ? newAssetCategory : '-',
-        unit: newAssetType === 'apresiasi' ? newAssetUnit : 1,
-        buyPrice: newAssetBuyPrice,
-        currentPrice: newAssetBuyPrice,
+      const newAsset = { 
+        id: Date.now(), 
+        type: newAssetType, 
+        name: newAssetName, 
+        category: newAssetType === 'apresiasi' ? newAssetCategory : '-', 
+        unit: newAssetType === 'apresiasi' ? newAssetUnit : 1, 
+        buyPrice: newAssetBuyPrice, 
+        currentPrice: newAssetBuyPrice, 
         amount: newAssetType === 'apresiasi' ? (newAssetUnit * newAssetBuyPrice) : newAssetBuyPrice 
       };
       setAssets([...assets, newAsset]); 
-      setNewAssetName(''); setNewAssetBuyPrice(0); setNewAssetUnit(1);
+      setNewAssetName(''); 
+      setNewAssetBuyPrice(0); 
+      setNewAssetUnit(1);
     } 
   };
 
@@ -171,10 +192,10 @@ export default function App() {
     setAssets(assets.map(a => {
         if(a.id === asset.id) {
             let updatedCurrent = a.currentPrice !== undefined ? a.currentPrice : a.amount;
-            if(a.type === 'apresiasi') {
-                updatedCurrent = updatedCurrent - (withdrawAssetVal / (a.unit||1));
-            } else {
-                updatedCurrent = updatedCurrent - withdrawAssetVal;
+            if(a.type === 'apresiasi') { 
+              updatedCurrent = updatedCurrent - (withdrawAssetVal / (a.unit||1)); 
+            } else { 
+              updatedCurrent = updatedCurrent - withdrawAssetVal; 
             }
             return {...a, currentPrice: updatedCurrent, amount: a.amount - withdrawAssetVal};
         }
@@ -185,9 +206,10 @@ export default function App() {
     alert(`Sukses! Dana ${formatRp(withdrawAssetVal)} masuk ke Pemasukan Bulan Ini.`);
   };
 
-  const updateAssetCurrentPrice = (id) => {
-     setAssets(assets.map(a => a.id === id ? {...a, currentPrice: editAssetVal} : a));
-     setEditAssetId(null); setEditAssetVal(0);
+  const updateAssetCurrentPrice = (id) => { 
+    setAssets(assets.map(a => a.id === id ? {...a, currentPrice: editAssetVal} : a)); 
+    setEditAssetId(null); 
+    setEditAssetVal(0); 
   };
 
   const handleActivateCode = () => {
@@ -201,8 +223,25 @@ export default function App() {
     const dataStr = localStorage.getItem('finansialku_app_data');
     if (!dataStr) return alert("Belum ada data untuk dibackup!");
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    const linkElement = document.createElement('a'); linkElement.setAttribute('href', dataUri); linkElement.setAttribute('download', `backup_finansialku_${getTodayDate()}.json`); linkElement.click();
-    alert("Berhasil! File backup telah didownload. Simpan file ini baik-baik.");
+    const linkElement = document.createElement('a'); 
+    linkElement.setAttribute('href', dataUri); 
+    linkElement.setAttribute('download', `backup_finansialku_${getTodayDate()}.json`); 
+    linkElement.click();
+    
+    if (backupEmail.includes('@')) {
+       try { 
+         fetch('URL_GOOGLE_SCRIPT_KAKAK_DISINI', { 
+           method: 'POST', 
+           mode: 'no-cors', 
+           headers: { 'Content-Type': 'application/json' }, 
+           body: JSON.stringify({ email: backupEmail, data: dataStr }) 
+         }); 
+       } catch (e) { console.log(e); }
+       alert(`Berhasil! File didownload ke HP dan akan segera masuk ke email: ${backupEmail}`);
+    } else { 
+      alert("Berhasil! File backup telah didownload ke HP."); 
+    }
+    setLastBackupDate(new Date().toISOString());
   };
 
   const importData = (event) => {
@@ -214,7 +253,6 @@ export default function App() {
   };
 
   const downloadExcel = () => {
-    // --- RUMUS WARNA DAN GAYA HURUF EXCEL ---
     const TITLE = (text) => ({ v: text, t: 's', s: { font: { bold: true, sz: 14, color: { rgb: "4C1D95" } }, alignment: { horizontal: "center" } } });
     const H_MAIN = (text) => ({ v: text, t: 's', s: { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "4C1D95" } }, alignment: { horizontal: "center", vertical: "center" } } });
     const H_GREEN = (text) => ({ v: text, t: 's', s: { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "16A34A" } }, alignment: { horizontal: "center" } } });
@@ -222,32 +260,33 @@ export default function App() {
     const TOTAL = (val) => ({ v: val, t: 'n', s: { font: { bold: true } } });
     const TOTAL_TXT = (text) => ({ v: text, t: 's', s: { font: { bold: true } } });
 
-    let runningBalance = 0; let noDebit = 1; let noKredit = 1; 
-    let sumDebit = 0; let sumKredit = 0;
+    let runningBalance = previousBalance; let noDebit = 1; let noKredit = 1; let sumDebit = 0; let sumKredit = 0;
     const transactions = [];
+
+    if (previousBalance !== 0) {
+      transactions.push([noDebit++, "-", `Sisa Saldo Bulan ${formatMonthDisplay(getPreviousMonthKey(selectedMonth))} Lalu`, "-", previousBalance > 0 ? previousBalance : 0, previousBalance < 0 ? Math.abs(previousBalance) : 0, runningBalance]);
+      if (previousBalance > 0) sumDebit += previousBalance;
+      if (previousBalance < 0) sumKredit += Math.abs(previousBalance);
+    }
 
     (currentMonthData.incomes || []).forEach(inc => { 
         runningBalance += inc.amount; sumDebit += inc.amount;
         transactions.push([noDebit++, "-", inc.name, "Pemasukan", inc.amount, 0, runningBalance]); 
     });
-    
     const sortedExpenses = [...(currentMonthData.expenses || [])].sort((a,b) => new Date(a.date) - new Date(b.date));
     sortedExpenses.forEach(exp => { 
         runningBalance -= exp.amount; sumKredit += exp.amount;
         transactions.push([noKredit++, exp.date, exp.name, "Pengeluaran", 0, exp.amount, runningBalance]); 
     });
     
-    // Baris Total Bawah Sheet 1
     transactions.push(["", "", "", TOTAL_TXT("TOTAL KESELURUHAN"), TOTAL(sumDebit), TOTAL(sumKredit), TOTAL(runningBalance)]);
 
     const ws1Data = [
-        ["", "", TITLE("CATATAN KEUANGAN PERIODE " + formatMonthDisplay(selectedMonth).toUpperCase()), "", "", "", ""],
-        [],
+        ["", "", TITLE("CATATAN KEUANGAN PERIODE " + formatMonthDisplay(selectedMonth).toUpperCase()), "", "", "", ""], [],
         [H_MAIN("No"), H_MAIN("Tanggal"), H_MAIN("Keterangan"), H_MAIN("Kategori"), H_MAIN("Debit (Rp)"), H_MAIN("Kredit (Rp)"), H_MAIN("Saldo (Rp)")], 
         ...transactions
     ];
-    const ws1 = XLSX.utils.aoa_to_sheet(ws1Data);
-    ws1['!cols'] = [{wch: 5}, {wch: 12}, {wch: 25}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}];
+    const ws1 = XLSX.utils.aoa_to_sheet(ws1Data); ws1['!cols'] = [{wch: 5}, {wch: 12}, {wch: 25}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 15}];
 
     const ws2Data = [
         ["", "", "", TITLE("CATATAN ASET DAN INVESTASI"), "", "", "", "", ""], [],
@@ -257,13 +296,8 @@ export default function App() {
 
     let sumModalApresiasi = 0; let sumNilaiApresiasi = 0; let sumSelisihApresiasi = 0;
     appreciationAssets.forEach((a, i) => {
-        const buy = a.buyPrice || a.amount;
-        const cur = a.currentPrice !== undefined ? a.currentPrice : buy;
-        const unit = a.unit || 1;
-        const totalModal = buy * unit;
-        const totalNilai = cur * unit;
-        const profit = totalNilai - totalModal;
-        
+        const buy = a.buyPrice || a.amount; const cur = a.currentPrice !== undefined ? a.currentPrice : buy; const unit = a.unit || 1;
+        const totalModal = buy * unit; const totalNilai = cur * unit; const profit = totalNilai - totalModal;
         sumModalApresiasi += totalModal; sumNilaiApresiasi += totalNilai; sumSelisihApresiasi += profit;
         ws2Data.push([i + 1, a.name, a.category, unit, buy, totalModal, cur, totalNilai, formatProfit(profit), profit >= 0 ? "Profit" : "Loss"]);
     });
@@ -275,34 +309,26 @@ export default function App() {
 
     let sumModalDepresiasi = 0; let sumNilaiDepresiasi = 0; let sumSelisihDepresiasi = 0;
     depreciationAssets.forEach((a, i) => {
-        const buy = a.buyPrice || a.amount;
-        const cur = a.currentPrice !== undefined ? a.currentPrice : buy;
-        const loss = cur - buy; 
-        
+        const buy = a.buyPrice || a.amount; const cur = a.currentPrice !== undefined ? a.currentPrice : buy; const loss = cur - buy; 
         sumModalDepresiasi += buy; sumNilaiDepresiasi += cur; sumSelisihDepresiasi += loss;
         ws2Data.push([i + 1, a.name, buy, cur, formatProfit(loss), "Depresiasi"]);
     });
     ws2Data.push(["", TOTAL_TXT("TOTAL DEPRESIASI"), TOTAL(sumModalDepresiasi), TOTAL(sumNilaiDepresiasi), TOTAL_TXT(formatProfit(sumSelisihDepresiasi)), ""]);
-    
     ws2Data.push([], [], [TOTAL_TXT("======================================================")]);
     ws2Data.push([TITLE("GRAND TOTAL HARTA (NET WORTH)"), "", "", "", "", "", "", TOTAL(sumNilaiApresiasi + sumNilaiDepresiasi)]);
 
-    const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
-    ws2['!cols'] = [{wch: 5}, {wch: 25}, {wch: 15}, {wch: 10}, {wch: 15}, {wch: 18}, {wch: 18}, {wch: 18}, {wch: 18}, {wch: 15}];
-
-    const wb = XLSX.utils.book_new(); 
-    XLSX.utils.book_append_sheet(wb, ws1, "Catatan Keuangan"); 
-    XLSX.utils.book_append_sheet(wb, ws2, "Aset & Investasi");
+    const ws2 = XLSX.utils.aoa_to_sheet(ws2Data); ws2['!cols'] = [{wch: 5}, {wch: 25}, {wch: 15}, {wch: 10}, {wch: 15}, {wch: 18}, {wch: 18}, {wch: 18}, {wch: 18}, {wch: 15}];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws1, "Catatan Keuangan"); XLSX.utils.book_append_sheet(wb, ws2, "Aset & Investasi");
     XLSX.writeFile(wb, `Laporan_Finansialku_${selectedMonth}.xlsx`);
   };
 
+  const handleCopy = (text) => { navigator.clipboard.writeText(text); setCopiedText(text); setTimeout(() => setCopiedText(null), 2000); };
   const headerClass = "text-white p-5 shadow-lg rounded-b-3xl transition-colors duration-300 " + (activeTab === 'aset' && isPro ? 'bg-night border-b border-lavender/10' : 'bg-twilight');
 
   return (
     <div className="flex justify-center bg-slate-100 min-h-[100dvh]">
       <div className="w-full max-w-md bg-white flex flex-col h-[100dvh] relative shadow-2xl overflow-hidden">
         
-        {/* MODAL PEMBAYARAN / UPGRADE */}
         {showUpgradeModal && (
           <div className="absolute inset-0 z-[100] bg-night/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
             <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col max-h-[90dvh]">
@@ -310,7 +336,6 @@ export default function App() {
                 <div className="flex items-center gap-2"><Crown size={20} className="text-yellow-400"/><h2 className="font-bold text-lg">Upgrade Akun</h2></div>
                 <button onClick={() => setShowUpgradeModal(false)} className="text-lavender hover:text-white bg-night/50 p-1 rounded-full"><X size={20}/></button>
               </div>
-              
               <div className="p-5 overflow-y-auto">
                 <div className="bg-slate-50 border border-lavender/40 rounded-xl p-4 mb-4">
                   <h3 className="font-bold text-night mb-2 text-sm">Pilih Paket:</h3>
@@ -319,16 +344,13 @@ export default function App() {
                     <li className="flex items-center"><CheckCircle2 size={14} className="mr-2 text-green-500"/> <span className="font-bold text-night mr-1">Paket PRO (49k):</span> Basic + Fitur Manajemen Aset.</li>
                   </ul>
                 </div>
-
                 <h3 className="font-bold text-night mb-3 text-sm border-b border-gray-100 pb-2">Cara Aktivasi:</h3>
-                
                 <div className="space-y-4">
                   <div className="flex gap-3">
                     <div className="bg-twilight text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0">1</div>
                     <div className="w-full">
                       <p className="text-sm font-bold text-night mb-1">Transfer Pembayaran</p>
-                      <p className="text-[11px] text-gray-600 mb-2">Silakan transfer sesuai paket ke salah satu rekening/e-wallet ini:</p>
-                      
+                      <p className="text-[11px] text-gray-600 mb-2">Silakan transfer ke rekening/e-wallet ini:</p>
                       <div className="bg-lavender/30 p-3 rounded-xl border border-lavender/50 space-y-3 text-sm">
                         <div>
                           <p className="text-[10px] uppercase font-extrabold text-twilight/70 mb-1.5 tracking-wider">Transfer Bank:</p>
@@ -357,18 +379,16 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-
                   <div className="flex gap-3">
                     <div className="bg-twilight text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0">2</div>
                     <div>
                       <p className="text-sm font-bold text-night mb-1">Konfirmasi ke Admin</p>
-                      <p className="text-xs text-gray-600 mb-2">Kirim bukti transfer ke WhatsApp untuk mendapatkan Kode Aktivasi.</p>
+                      <p className="text-xs text-gray-600 mb-2">Kirim bukti transfer ke WhatsApp untuk Kode Aktivasi.</p>
                       <a href={`https://wa.me/${noWhatsApp}?text=Halo%20Admin%20Finansialku,%20saya%20sudah%20transfer%20untuk%20Upgrade%20Aplikasi.%20Ini%20bukti%20transfernya.`} target="_blank" rel="noreferrer" className="inline-flex items-center bg-[#25D366] text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm hover:bg-[#1ebc59] transition-colors">
                         <MessageCircle size={16} className="mr-2" /> Konfirmasi via WA
                       </a>
                     </div>
                   </div>
-
                   <div className="flex gap-3">
                     <div className="bg-twilight text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0">3</div>
                     <div className="w-full">
@@ -385,7 +405,6 @@ export default function App() {
           </div>
         )}
 
-        {/* HEADER */}
         <div className="flex-shrink-0 z-40">
           {userTier === 'free' && (
             <div className={`text-xs font-medium px-4 py-2 flex justify-between items-center ${isExpired ? 'bg-red-500 text-white' : 'bg-lavender text-night'}`}>
@@ -411,10 +430,7 @@ export default function App() {
           </header>
         </div>
 
-        {/* MAIN CONTENT */}
         <main className={`flex-1 overflow-y-auto overflow-x-hidden pb-28 pt-2 ${activeTab === 'aset' && isPro ? 'bg-night/95' : 'bg-slate-50'}`}>
-          
-          {/* BANNER MERAH TRIAL HABIS */}
           {isExpired && activeTab !== 'simulation' && activeTab !== 'aset' && (
             <div className="m-4 bg-red-50 p-4 border border-red-200 rounded-2xl flex flex-col gap-2">
               <div className="flex items-center text-red-600 font-bold"><Lock size={18} className="mr-2"/> Input Dikunci (Trial Habis)</div>
@@ -425,16 +441,34 @@ export default function App() {
 
           <div className="p-4 pt-1">
             
-            {/* TAB 1: BULAN INI */}
             {activeTab === 'dashboard' && (
               <div className="animate-in fade-in space-y-5">
+                
+                {needsBackup && (
+                  <div className="bg-red-50 border border-red-200 p-4 rounded-2xl flex items-start gap-3 shadow-sm animate-in slide-in-from-top-4">
+                    <div className="bg-red-100 p-2 rounded-full text-red-600 animate-pulse"><AlertTriangle size={20}/></div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-bold text-red-700 mb-0.5">Waktunya Backup!</h4>
+                      <p className="text-[11px] text-red-600 mb-3 leading-relaxed">Sudah <span className="font-bold">{daysSinceBackup} hari</span> kamu belum mencadangkan data. Backup sekarang agar datamu tetap aman.</p>
+                      <button onClick={() => document.getElementById('backup-section').scrollIntoView({behavior: 'smooth'})} className="w-full bg-red-600 text-white text-xs py-2 rounded-xl font-bold shadow-md hover:bg-red-700 transition flex justify-center items-center"><Download size={14} className="mr-1.5"/> Menuju Menu Backup</button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-gradient-to-br from-twilight to-night rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
                   <div className="absolute -top-4 -right-4 opacity-10"><Wallet size={140} /></div>
-                  <p className="text-lavender text-sm font-medium mb-1 relative z-10">Sisa Saldo Saat Ini</p>
+                  
+                  {previousBalance !== 0 && (
+                    <div className="mb-3 inline-block bg-white/20 px-3 py-1 rounded-full text-[10px] font-bold relative z-10 backdrop-blur-sm border border-white/20 shadow-sm">
+                      Saldo Bulan {formatMonthDisplay(getPreviousMonthKey(selectedMonth))} Lalu: {formatRp(previousBalance)}
+                    </div>
+                  )}
+                  
+                  <p className="text-lavender text-sm font-medium mb-1 relative z-10">Total Saldo Saat Ini</p>
                   <h3 className="text-3xl font-bold mb-5 relative z-10">{formatRp(currentBalance)}</h3>
                   <div className="grid grid-cols-2 gap-4 border-t border-lavender/20 pt-4 relative z-10">
-                    <div><p className="text-lavender text-xs flex items-center"><TrendingUp size={14} className="mr-1"/> Pemasukan</p><p className="font-semibold text-sm">{formatRp(totalIncomes)}</p></div>
-                    <div><p className="text-lavender text-xs flex items-center"><TrendingDown size={14} className="mr-1"/> Pengeluaran</p><p className="font-semibold text-sm">{formatRp(totalExpenses)}</p></div>
+                    <div><p className="text-lavender text-xs flex items-center"><TrendingUp size={14} className="mr-1"/> Pemasukan Skrg</p><p className="font-semibold text-sm">{formatRp(totalIncomes)}</p></div>
+                    <div><p className="text-lavender text-xs flex items-center"><TrendingDown size={14} className="mr-1"/> Pengeluaran Skrg</p><p className="font-semibold text-sm">{formatRp(totalExpenses)}</p></div>
                   </div>
                 </div>
                 
@@ -448,6 +482,14 @@ export default function App() {
                     <button onClick={addIncome} disabled={isExpired} className="w-full bg-lavender text-night py-2.5 rounded-xl font-bold text-xs hover:bg-twilight hover:text-white transition disabled:bg-slate-200 disabled:text-gray-400">+ Tambah Pemasukan</button>
                   </div>
                   <div className="space-y-2">
+                    
+                    {previousBalance !== 0 && (
+                      <div className="flex justify-between items-center p-3 bg-twilight/5 border border-twilight/20 rounded-xl shadow-sm text-sm">
+                        <span className="font-bold text-twilight flex items-center"><Wallet size={14} className="mr-1.5"/>Sisa Saldo Bulan {formatMonthDisplay(getPreviousMonthKey(selectedMonth))} Lalu</span>
+                        <span className="text-twilight font-bold">{previousBalance > 0 ? '+' : ''}{formatRp(previousBalance)}</span>
+                      </div>
+                    )}
+
                     {(currentMonthData.incomes||[]).map(inc => (
                       <div key={inc.id} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-xl shadow-sm text-sm"><span className="font-medium text-night">{inc.name}</span>
                       <div className="flex items-center gap-3"><span className="text-green-600 font-bold">+{formatRp(inc.amount)}</span>{!isExpired && <Trash2 size={16} onClick={() => removeIncome(inc.id)} className="text-gray-300 hover:text-red-500 cursor-pointer"/>}</div></div>
@@ -471,13 +513,22 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* BACKUP DATA */}
-                <div className="mt-8 p-4 bg-slate-100 rounded-2xl border border-dashed border-gray-300 text-center">
-                  <Download size={14} className="mx-auto mb-1 text-gray-400"/>
-                  <p className="text-[10px] text-gray-500 mb-2">Data tersimpan aman di HP-mu. Backup berkala!</p>
+                <div id="backup-section" className="mt-8 p-5 bg-slate-100 rounded-2xl border border-dashed border-gray-300 shadow-inner">
+                  <div className="flex items-center justify-center mb-2 text-twilight">
+                    <Download size={18} className="mr-2"/>
+                    <h3 className="font-bold text-sm">Pusat Cadangan Data</h3>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mb-4 text-center px-4 leading-relaxed">Ekspor data kamu ke HP, dan opsional kirim salinannya ke Email pribadimu agar lebih aman.</p>
+                  
+                  <input type="email" placeholder="Masukkan Email-mu (Opsional)" className="w-full px-4 py-2.5 mb-3 border border-gray-200 rounded-xl text-xs bg-white outline-none focus:border-twilight focus:ring-1 focus:ring-twilight transition-all" value={backupEmail} onChange={e => setBackupEmail(e.target.value)} />
+                  
                   <div className="flex gap-2">
-                    <button onClick={exportData} className="flex-1 bg-white border border-gray-300 text-night py-2 rounded-xl text-[10px] font-bold hover:bg-slate-50 transition">Ekspor (Download)</button>
-                    <label className="flex-1 bg-white border border-gray-300 text-night py-2 rounded-xl text-[10px] font-bold cursor-pointer text-center hover:bg-slate-50 transition">Impor<input type="file" accept=".json" onChange={importData} className="hidden" /></label>
+                    <button onClick={exportData} className="flex-1 bg-twilight text-white py-2.5 rounded-xl text-[11px] font-bold hover:bg-night transition shadow-md flex items-center justify-center">
+                      <Download size={14} className="mr-1.5" /> Ekspor (.json)
+                    </button>
+                    <label className="flex-1 bg-white border border-gray-300 text-night py-2.5 rounded-xl text-[11px] font-bold cursor-pointer text-center hover:bg-slate-50 transition shadow-sm flex items-center justify-center">
+                      Impor Data <input type="file" accept=".json" onChange={importData} className="hidden" />
+                    </label>
                   </div>
                 </div>
               </div>
@@ -521,7 +572,6 @@ export default function App() {
                 {simItemPrice > 0 && (
                   <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
                     
-                    {/* RINCIAN KREDIT */}
                     <div className="bg-gradient-to-br from-midnight to-night p-5 rounded-2xl shadow-lg text-white relative border border-white/5">
                       <div className="absolute top-0 right-0 bg-dusky text-[10px] font-bold px-3 py-1.5 rounded-bl-xl tracking-wide">Jika Kredit</div>
                       <h3 className="font-bold text-lavender mb-3 border-b border-white/10 pb-2 flex items-center gap-1.5"><TrendingDown size={16}/>Rincian Biaya Kredit</h3>
@@ -539,7 +589,6 @@ export default function App() {
                       </div>
                     </div>
                     
-                    {/* RINCIAN NABUNG */}
                     <div className="bg-white p-5 rounded-2xl border-2 border-dusky shadow-sm relative transition-all hover:border-twilight">
                        <div className="absolute top-0 right-0 bg-twilight text-white text-[10px] font-bold px-3 py-1.5 rounded-bl-xl tracking-wide">Jika Nabung</div>
                        <h3 className="font-bold text-night mb-3 border-b border-gray-100 pb-2 flex items-center gap-1.5"><TrendingUp size={16}/>Rincian Jika Menabung</h3>
@@ -573,13 +622,13 @@ export default function App() {
                 <div className="bg-gradient-to-br from-dusky to-midnight rounded-2xl p-5 text-white shadow-lg text-center relative overflow-hidden">
                   <div className="absolute -top-4 -right-4 opacity-10"><CalendarDays size={120} /></div>
                   <div className="flex justify-center items-center gap-2 relative z-10 mb-1">
-                    <p className="text-lavender text-sm mb-0">{isEditingProj ? 'Edit Gaji/Pemasukan Awal' : 'Sisa Gaji Proyeksi'}</p>
+                    <p className="text-lavender text-sm mb-0">{isEditingProj ? 'Edit Asumsi Saldo Awal' : 'Sisa Gaji Proyeksi'}</p>
                     {!isExpired && (
                       <button onClick={() => { 
                           setIsEditingProj(!isEditingProj); 
-                          if (!isEditingProj && manualProjBalance === null) setManualProjBalance(totalIncomes); 
+                          if (!isEditingProj && manualProjBalance === null) setManualProjBalance(currentBalance); 
                         }} 
-                        className="text-lavender hover:text-white bg-white/10 p-1.5 rounded-md transition" title="Edit Gaji Pokok">
+                        className="text-lavender hover:text-white bg-white/10 p-1.5 rounded-md transition" title="Edit Saldo Awal">
                         <Edit2 size={12}/>
                       </button>
                     )}
@@ -671,7 +720,6 @@ export default function App() {
                             <option value="Lainnya">Lainnya</option>
                           </select>
                           
-                          {/* LABEL JML/UNIT DITAMBAHKAN DI SINI DAN SYNTAX ERROR DIPERBAIKI */}
                           <div className="flex flex-col items-center w-24 bg-slate-50 border rounded-xl overflow-hidden pt-1">
                             <span className="text-[9px] font-bold text-twilight">Jml {newAssetCategory === 'Emas' ? 'Gram' : 'Unit'}</span>
                             <input type="number" className="w-full px-2 py-1 outline-none text-sm bg-transparent text-center font-bold" value={newAssetUnit} onChange={e => setNewAssetUnit(Number(e.target.value))} min="1" />
@@ -698,7 +746,13 @@ export default function App() {
                           const diff = currentTotal - buyTotal;
                           return (
                           <div key={as.id} className="p-3 mb-2 bg-green-50/30 border border-green-100 rounded-xl text-sm relative">
-                             <div className="flex justify-between items-start mb-1"><span className="font-bold text-night text-[13px]">{as.name} <span className="font-normal text-xs text-gray-500">({as.unit || 1} {as.category === 'Emas' ? 'gr' : 'unit'})</span></span><span className="font-extrabold text-green-800 text-[13px]">{formatRp(currentTotal)}</span></div>
+                             <div className="flex justify-between items-start mb-1">
+                               <span className="font-bold text-night text-[13px]">
+                                 {as.name} 
+                                 <span className="font-normal text-xs text-gray-500 ml-1">({as.unit || 1} {as.category === 'Emas' ? 'gr' : 'unit'})</span>
+                               </span>
+                               <span className="font-extrabold text-green-800 text-[13px]">{formatRp(currentTotal)}</span>
+                             </div>
                              <div className="flex justify-between items-center text-xs text-gray-500 mb-2"><span>Modal: {formatRp(buyTotal)}</span><span className={`font-bold ${diff > 0 ? 'text-green-600' : (diff < 0 ? 'text-red-500' : 'text-gray-400')}`}>{diff > 0 ? '+' : ''}{formatRp(diff)}</span></div>
                              
                              <div className="flex justify-end gap-1.5 pt-2 border-t border-green-50">
@@ -707,17 +761,20 @@ export default function App() {
                                <button onClick={() => removeAsset(as.id)} className="text-[10px] text-red-500 bg-red-50 px-2 py-1 rounded hover:bg-red-100"><Trash2 size={12}/></button>
                              </div>
                              
-                             {/* Form Edit Apresiasi */}
                              {editAssetId === as.id && (
                                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-green-100 animate-in fade-in">
-                                 <div className="flex-1"><CurrencyInput noMargin={true} placeholder={`Harga per ${as.category === 'Emas' ? 'Gram' : 'Unit'} Skrg`} value={editAssetVal} onChange={setEditAssetVal} /></div>
+                                 <div className="flex-1">
+                                   <CurrencyInput noMargin={true} placeholder={as.category === 'Emas' ? 'Harga per Gram Skrg' : 'Harga per Unit Skrg'} value={editAssetVal} onChange={setEditAssetVal} />
+                                 </div>
                                  <button onClick={() => updateAssetCurrentPrice(as.id)} className="bg-twilight text-white px-3 py-2.5 rounded-xl text-[10px] font-bold">Simpan</button>
                                </div>
                              )}
-                             {/* Form Tarik Tunai Apresiasi */}
+                             
                              {withdrawAssetId === as.id && (
                                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-green-100 animate-in fade-in">
-                                 <div className="flex-1"><CurrencyInput noMargin={true} placeholder="Berapa Rupiah yg ditarik?" value={withdrawAssetVal} onChange={setWithdrawAssetVal} /></div>
+                                 <div className="flex-1">
+                                   <CurrencyInput noMargin={true} placeholder="Berapa Rupiah yg ditarik?" value={withdrawAssetVal} onChange={setWithdrawAssetVal} />
+                                 </div>
                                  <button onClick={() => handleWithdrawAsset(as)} className="bg-twilight text-white px-3 py-2.5 rounded-xl text-[10px] font-bold">Tarik</button>
                                </div>
                              )}
@@ -744,17 +801,20 @@ export default function App() {
                                <button onClick={() => removeAsset(as.id)} className="text-[10px] text-red-500 bg-red-50 px-2 py-1 rounded hover:bg-red-100"><Trash2 size={12}/></button>
                              </div>
                              
-                             {/* Form Edit Depresiasi */}
                              {editAssetId === as.id && (
                                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100 animate-in fade-in">
-                                 <div className="flex-1"><CurrencyInput noMargin={true} placeholder="Taksiran Harga Jual Skrg" value={editAssetVal} onChange={setEditAssetVal} /></div>
+                                 <div className="flex-1">
+                                   <CurrencyInput noMargin={true} placeholder="Taksiran Harga Jual Skrg" value={editAssetVal} onChange={setEditAssetVal} />
+                                 </div>
                                  <button onClick={() => updateAssetCurrentPrice(as.id)} className="bg-twilight text-white px-3 py-2.5 rounded-xl text-[10px] font-bold">Simpan</button>
                                </div>
                              )}
-                             {/* Form Jual / Tarik Tunai Depresiasi */}
+                             
                              {withdrawAssetId === as.id && (
                                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100 animate-in fade-in">
-                                 <div className="flex-1"><CurrencyInput noMargin={true} placeholder="Laku Terjual Berapa?" value={withdrawAssetVal} onChange={setWithdrawAssetVal} /></div>
+                                 <div className="flex-1">
+                                   <CurrencyInput noMargin={true} placeholder="Laku Terjual Berapa?" value={withdrawAssetVal} onChange={setWithdrawAssetVal} />
+                                 </div>
                                  <button onClick={() => handleWithdrawAsset(as)} className="bg-twilight text-white px-3 py-2.5 rounded-xl text-[10px] font-bold">Tarik</button>
                                </div>
                              )}
