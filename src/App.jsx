@@ -59,6 +59,9 @@ export default function App() {
   const [lastBackupDate, setLastBackupDate] = useState(savedData?.lastBackupDate || new Date().toISOString());
   const [backupEmail, setBackupEmail] = useState(savedData?.backupEmail || '');
 
+  // --- STATE UNTUK POP-UP CUSTOM CANTIK ---
+  const [customAlert, setCustomAlert] = useState(null);
+
   useEffect(() => { 
     setDaysUsed(Math.floor(Math.abs(new Date() - new Date(firstOpenDate)) / (1000 * 60 * 60 * 24))); 
   }, [firstOpenDate]);
@@ -187,8 +190,9 @@ export default function App() {
   };
 
   const removeAsset = (id) => confirmDelete(() => setAssets(assets.filter(e => e.id !== id)));
+  
   const handleWithdrawAsset = (asset) => {
-    if (withdrawAssetVal <= 0) return alert("Nominal tidak valid!");
+    if (withdrawAssetVal <= 0) return setCustomAlert({ title: 'Peringatan', message: 'Nominal tidak valid!', type: 'error' });
     setAssets(assets.map(a => {
         if(a.id === asset.id) {
             let updatedCurrent = a.currentPrice !== undefined ? a.currentPrice : a.amount;
@@ -203,7 +207,7 @@ export default function App() {
     }));
     updateMonth({ incomes: [...(currentMonthData.incomes||[]), { id: Date.now(), name: `Pencairan: ${asset.name}`, amount: withdrawAssetVal }] });
     setWithdrawAssetId(null); setWithdrawAssetVal(0); setActiveTab('dashboard');
-    alert(`Sukses! Dana ${formatRp(withdrawAssetVal)} masuk ke Pemasukan Bulan Ini.`);
+    setCustomAlert({ title: 'Pencairan Sukses!', message: `Dana sebesar ${formatRp(withdrawAssetVal)} telah berhasil masuk ke Pemasukan Bulan Ini.`, type: 'success' });
   };
 
   const updateAssetCurrentPrice = (id) => { 
@@ -214,14 +218,23 @@ export default function App() {
 
   const handleActivateCode = () => {
     const code = activationCode.trim().toUpperCase();
-    if (code === 'SWBASIC26') { setUserTier('basic'); setShowUpgradeModal(false); setActivationCode(''); alert('Selamat! Aplikasi berhasil di-Upgrade ke Paket BASIC.'); } 
-    else if (code === 'SWPRO26') { setUserTier('pro'); setShowUpgradeModal(false); setActivationCode(''); alert('Luar Biasa! Selamat datang di Paket PRO. Fitur Aset telah terbuka!'); } 
-    else { alert('Kode Aktivasi tidak valid. Silakan hubungi Admin via WA.'); }
+    if (code === 'SWBASIC26') { 
+      setUserTier('basic'); setShowUpgradeModal(false); setActivationCode(''); 
+      setCustomAlert({ title: 'Aktivasi Berhasil', message: 'Selamat! Aplikasi berhasil di-Upgrade ke Paket BASIC.', type: 'success' }); 
+    } 
+    else if (code === 'SWPRO26') { 
+      setUserTier('pro'); setShowUpgradeModal(false); setActivationCode(''); 
+      setCustomAlert({ title: 'Aktivasi Berhasil', message: 'Luar Biasa! Selamat datang di Paket PRO. Fitur Manajemen Aset telah terbuka untukmu!', type: 'success' }); 
+    } 
+    else { 
+      setCustomAlert({ title: 'Aktivasi Gagal', message: 'Kode Aktivasi tidak valid. Silakan hubungi Admin via WhatsApp.', type: 'error' }); 
+    }
   };
 
   const exportData = () => {
     const dataStr = localStorage.getItem('finansialku_app_data');
-    if (!dataStr) return alert("Belum ada data untuk dibackup!");
+    if (!dataStr) return setCustomAlert({ title: 'Peringatan', message: 'Belum ada data untuk dibackup!', type: 'error' });
+    
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
     const linkElement = document.createElement('a'); 
     linkElement.setAttribute('href', dataUri); 
@@ -237,9 +250,9 @@ export default function App() {
            body: JSON.stringify({ email: backupEmail, data: dataStr }) 
          }); 
        } catch (e) { console.log(e); }
-       alert(`Berhasil! File didownload ke HP dan akan segera masuk ke email: ${backupEmail}`);
+       setCustomAlert({ title: 'Backup Terkirim!', message: `File backup telah didownload ke HP dan salinannya akan segera masuk ke email: ${backupEmail}`, type: 'success' });
     } else { 
-      alert("Berhasil! File backup telah didownload ke HP."); 
+       setCustomAlert({ title: 'Backup Berhasil!', message: 'File backup telah berhasil didownload ke HP kamu. Simpan baik-baik ya!', type: 'success' });
     }
     setLastBackupDate(new Date().toISOString());
   };
@@ -247,8 +260,15 @@ export default function App() {
   const importData = (event) => {
     const fileReader = new FileReader(); fileReader.readAsText(event.target.files[0], "UTF-8");
     fileReader.onload = e => {
-      try { const json = JSON.parse(e.target.result); if (window.confirm("Import data akan menimpa data saat ini. Lanjutkan?")) { localStorage.setItem('finansialku_app_data', JSON.stringify(json)); window.location.reload(); } } 
-      catch (err) { alert("File tidak valid!"); }
+      try { 
+        const json = JSON.parse(e.target.result); 
+        if (window.confirm("Import data akan menimpa seluruh data saat ini. Lanjutkan?")) { 
+          localStorage.setItem('finansialku_app_data', JSON.stringify(json)); 
+          window.location.reload(); 
+        } 
+      } catch (err) { 
+        setCustomAlert({ title: 'Gagal Impor', message: 'Format file tidak valid! Pastikan file adalah .json dari aplikasi ini.', type: 'error' }); 
+      }
     };
   };
 
@@ -329,6 +349,34 @@ export default function App() {
     <div className="flex justify-center bg-slate-100 min-h-[100dvh]">
       <div className="w-full max-w-md bg-white flex flex-col h-[100dvh] relative shadow-2xl overflow-hidden">
         
+        {/* --- CUSTOM POP-UP ALERT --- */}
+        {customAlert && (
+          <div className="absolute inset-0 z-[200] bg-night/80 backdrop-blur-sm flex items-center justify-center p-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-white rounded-3xl w-full max-w-[300px] overflow-hidden shadow-2xl flex flex-col p-6 text-center">
+              <div className="mx-auto mb-4">
+                {customAlert.type === 'success' ? (
+                  <div className="bg-green-100 p-4 rounded-full text-green-500 shadow-inner">
+                    <CheckCircle2 size={36} strokeWidth={2.5} />
+                  </div>
+                ) : (
+                  <div className="bg-red-100 p-4 rounded-full text-red-500 shadow-inner">
+                    <AlertTriangle size={36} strokeWidth={2.5} />
+                  </div>
+                )}
+              </div>
+              <h3 className="text-lg font-extrabold text-night mb-2">{customAlert.title}</h3>
+              <p className="text-[13px] text-gray-600 mb-6 leading-relaxed px-2">{customAlert.message}</p>
+              <button 
+                onClick={() => setCustomAlert(null)} 
+                className={`w-full text-white py-3 rounded-xl font-bold shadow-md transition transform active:scale-95 ${customAlert.type === 'success' ? 'bg-twilight hover:bg-night' : 'bg-red-500 hover:bg-red-600'}`}
+              >
+                Mengerti
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL PEMBAYARAN / UPGRADE */}
         {showUpgradeModal && (
           <div className="absolute inset-0 z-[100] bg-night/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in">
             <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col max-h-[90dvh]">
@@ -534,7 +582,6 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB 2: SIMULASI */}
             {activeTab === 'simulation' && (
                <div className="animate-in fade-in space-y-5">
                 <h2 className="text-lg font-bold text-night flex items-center"><Calculator className="mr-2 text-dusky" size={20} /> Kalkulator Cerdas</h2>
@@ -614,7 +661,6 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB 3: PROYEKSI */}
             {activeTab === 'projection' && (
               <div className="animate-in fade-in space-y-5">
                 <h2 className="text-lg font-bold text-night flex items-center"><Target className="mr-2 text-dusky" size={20} /> Proyeksi Bulan Depan</h2>
@@ -683,7 +729,6 @@ export default function App() {
               </div>
             )}
 
-            {/* TAB 4: ASET */}
             {activeTab === 'aset' && (
               <div className="animate-in fade-in space-y-5">
                 <h2 className={`text-lg font-bold flex items-center ${isPro ? 'text-lavender' : 'text-night'}`}><Landmark className={`mr-2 ${isPro ? 'text-lavender' : 'text-yellow-500'}`} size={20} /> Aset & Investasi</h2>
@@ -736,7 +781,6 @@ export default function App() {
                       <button onClick={addAsset} className="w-full mt-3 bg-lavender text-twilight py-3 rounded-xl font-bold text-xs hover:bg-twilight hover:text-white transition shadow-sm">+ Simpan Ke Brankas</button>
                     </div>
 
-                    {/* TABEL ASET APRESIASI */}
                     <div className="p-4 bg-white rounded-3xl border border-green-100 shadow-sm">
                       <div className="flex justify-between items-center mb-3 pb-2 border-b border-green-50"><h3 className="font-extrabold text-night text-sm"><TrendingUp size={16} className="inline mr-1 text-green-500"/>APRESIASI</h3><span className="font-bold text-green-700">{formatRp(totalAppreciation)}</span></div>
                       {appreciationAssets.length === 0 ? <p className="text-center text-xs text-gray-400 py-4 italic">Belum ada aset apresiasi.</p> :
@@ -782,7 +826,6 @@ export default function App() {
                         )})}
                     </div>
 
-                    {/* TABEL ASET DEPRESIASI */}
                     <div className="p-4 bg-white rounded-3xl border border-lavender shadow-sm">
                       <div className="flex justify-between items-center mb-3 pb-2 border-b border-gray-100"><h3 className="font-extrabold text-night text-sm"><Car size={16} className="inline mr-1 text-lavender"/>DEPRESIASI</h3><span className="font-bold text-lavender">{formatRp(totalDepreciation)}</span></div>
                       {depreciationAssets.length === 0 ? <p className="text-center text-xs text-gray-400 py-4 italic">Belum ada aset depresiasi.</p> :
@@ -826,7 +869,6 @@ export default function App() {
               </div>
             )}
 
-            {/* FOOTER COPYRIGHT */}
             <footer className="mt-12 mb-4 text-center transition-opacity duration-300">
               <p className={`text-[11px] font-medium tracking-wide transition-colors ${activeTab === 'aset' && isPro ? 'text-lavender/50' : 'text-night/50'}`}>© 2026 Finansialku.</p>
               <div className="flex flex-col items-center justify-center font-medium mt-1.5 relative">
