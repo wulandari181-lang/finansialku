@@ -230,7 +230,7 @@ export default function App() {
     
     if (backupEmail.includes('@')) {
        try { 
-         fetch('URL_GOOGLE_SCRIPT_KAKAK_DISINI', { 
+         fetch('https://script.google.com/macros/s/AKfycbxBH9dJVPgM4nNmvOaafSkaoMtlO07VIunTAcHma9U6NJBG_yPKVFtoljx3YAelzvF8BA/exec', { 
            method: 'POST', 
            mode: 'no-cors', 
            headers: { 'Content-Type': 'application/json' }, 
